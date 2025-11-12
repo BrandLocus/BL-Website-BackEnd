@@ -52,6 +52,10 @@ public class BaseUser extends BaseEntity implements UserDetails {
     @ManyToOne
     private Roles role;
 
+    private String country;
+
+    private String state;
+
 
     @OneToOne(mappedBy = "user", cascade = CascadeType.ALL)
     private Profile profile;
