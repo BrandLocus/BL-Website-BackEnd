@@ -69,6 +69,8 @@ public class AuthServiceImpl implements AuthService {
                     .password(passwordEncoder.encode(request.getPassword()))
                     .role(role)
                     .isActive(true)
+                    .state(request.getState())
+                    .country(request.getCountry())
                     .userStatus(UserStatus.ACTIVE.getValue())
                     .agreementToReceiveAIGeneratedResponse(request.isAgreementToReceiveAIGeneratedResponse())
                     .agreementToReceiveAIGeneratedResponseTimestamp(LocalDateTime.now())
@@ -81,6 +83,8 @@ public class AuthServiceImpl implements AuthService {
                     .email(newUser.getEmail())
                     .industryName(newUser.getIndustryName())
                     .businessName(newUser.getBusinessName())
+                    .state(request.getState())
+                    .country(request.getCountry())
                     .role(role.getName())
                     .build();
 

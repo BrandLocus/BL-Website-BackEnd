@@ -37,4 +37,20 @@ public class AdminDashboardController {
                         .build()
         );
     }
+
+
+    @GetMapping("/user-graph")
+    public ResponseEntity<ApiResponse<?>> UserDashboard(
+            Principal principal,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate
+    ) {
+        return adminDashboardService.userGraph(principal,startDate,endDate);
+
+    }
+
+
+
+
+
 }

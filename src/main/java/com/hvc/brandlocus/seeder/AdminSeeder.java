@@ -1,6 +1,7 @@
 package com.hvc.brandlocus.seeder;
 
 import com.hvc.brandlocus.entities.BaseUser;
+import com.hvc.brandlocus.entities.Profile;
 import com.hvc.brandlocus.entities.Roles;
 import com.hvc.brandlocus.enums.UserRoles;
 import com.hvc.brandlocus.enums.UserStatus;
@@ -57,6 +58,19 @@ public class AdminSeeder implements CommandLineRunner {
                 .agreementToReceiveAIGeneratedResponse(false)
                 .agreementToReceiveAIGeneratedResponseTimestamp(LocalDateTime.now())
                 .build();
+
+        Profile profile = Profile.builder()
+                .user(admin)
+                .firstName(admin.getFirstName())
+                .lastName(admin.getLastName())
+                .email(admin.getEmail())
+                .industryName(admin.getIndustryName())
+                .businessName(admin.getBusinessName())
+                .state(admin.getState())
+                .country(admin.getCountry())
+                .role(admin.getRole().getName())
+                .build();
+        admin.setProfile(profile);
 
         baseUserRepository.save(admin);
         log.info("✅ Default admin user created -> email: {}, password: {}", adminEmail, "Admin@123");

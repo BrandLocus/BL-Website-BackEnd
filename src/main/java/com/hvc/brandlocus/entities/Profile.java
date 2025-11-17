@@ -36,6 +36,10 @@ public class Profile extends BaseEntity{
 
     private String role;
 
+    private String country;
+
+    private String state;
+
     private String profileImageUrl;
 
 

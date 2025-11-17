@@ -52,6 +52,9 @@ public class ProfileServiceImpl implements ProfileService {
                     .businessName(profile.getBusinessName())
                     .industryName(profile.getLastName())
                     .role(profile.getRole())
+                    .state(profile.getState())
+                    .country(profile.getCountry())
+                    .profileImageUrl(profile.getProfileImageUrl())
                     .email(profile.getEmail()).build();
 
             return ResponseEntity.ok(createSuccessResponse(response, "Profile fetched successfully"));

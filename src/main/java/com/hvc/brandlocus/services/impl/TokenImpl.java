@@ -5,10 +5,13 @@ import com.hvc.brandlocus.dto.request.TokenRequest;
 import com.hvc.brandlocus.dto.request.VerifyTokenRequest;
 import com.hvc.brandlocus.entities.Token;
 import com.hvc.brandlocus.repositories.TokenRepository;
+import com.hvc.brandlocus.services.EmailService;
 import com.hvc.brandlocus.services.TokenService;
+import com.hvc.brandlocus.services.impl.email.EmailServiceStrategy;
 import com.hvc.brandlocus.utils.ApiResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
@@ -27,6 +30,12 @@ import static com.hvc.brandlocus.utils.ResponseUtils.createSuccessResponse;
 public class TokenImpl implements TokenService {
 
     private final TokenRepository tokenRepository;
+
+    private final EmailServiceStrategy emailStrategy;
+
+    @Value("${app.email.provider}")
+    private String provider;
+
 
     @Override
     public ResponseEntity<ApiResponse<?>> getToken(TokenRequest request) {
@@ -72,6 +81,16 @@ public class TokenImpl implements TokenService {
            );
 
            log.info("call notification service to send email to {}",email);
+
+
+           emailStrategy.send(
+                   "Email Verification",
+                   email,
+                   "Your verification code is: " + token.getToken()
+           );
+
+
+
 
            log.info("This is the token: {}", token.getToken());
 

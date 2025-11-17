@@ -9,4 +9,5 @@ import java.time.LocalDate;
 
 public interface AdminDashboardService {
     ResponseEntity<ApiResponse<?>> adminDashboard(Principal principal,String filter, LocalDate startDate, LocalDate endDate);
+    ResponseEntity<ApiResponse<?>> userGraph(Principal principal, LocalDate startDate, LocalDate endDate);
 }

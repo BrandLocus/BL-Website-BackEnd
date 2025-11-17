@@ -30,6 +30,14 @@ public class RegisterUserRequest {
     @NotBlank(message = "business name  required")
     private String businessName;
 
+    @NotNull(message = "country is required")
+    @NotBlank(message = "country required")
+    private String country;
+
+    @NotNull(message = "state is required")
+    @NotBlank(message = "state is required")
+    private String state;
+
     @NotNull(message = "agreement  required")
     private boolean agreementToReceiveAIGeneratedResponse;
 }

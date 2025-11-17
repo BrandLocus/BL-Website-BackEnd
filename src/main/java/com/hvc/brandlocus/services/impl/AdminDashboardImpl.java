@@ -24,8 +24,12 @@ import java.security.Principal;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.YearMonth;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 import static com.hvc.brandlocus.utils.ResponseUtils.createFailureResponse;
 
@@ -123,6 +127,72 @@ public class AdminDashboardImpl implements AdminDashboardService {
             return ResponseEntity.internalServerError()
                     .body(ResponseUtils.createFailureResponse("Server error", ex.getMessage()));
         }
+    }
+
+    @Override
+    public ResponseEntity<ApiResponse<?>> userGraph(Principal principal, LocalDate startDate, LocalDate endDate) {
+        try {
+            log.info("fetch user analytics");
+            Optional<BaseUser> optionalUser = baseUserRepository.findByEmail(principal.getName().trim());
+            if (optionalUser.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body(createFailureResponse("User not found", "User with email " + principal.getName() + " does not exist"));
+            }
+            BaseUser admin = optionalUser.get();
+
+            if (!UserRoles.ADMIN.getValue().equalsIgnoreCase(admin.getRole().getName())) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body(ResponseUtils.createFailureResponse("access denied", "only admins can access this resource"));
+            }
+
+            if (startDate == null || endDate == null) {
+                YearMonth currentMonth = YearMonth.now();
+                startDate = currentMonth.atDay(1);
+                endDate = currentMonth.atEndOfMonth();
+            }
+
+            log.info("this is the start date: {}",startDate);
+            log.info("this is the end date: {}",endDate);
+
+            log.info("Date filter range: {} -> {}", startDate.atStartOfDay(), endDate.atTime(23,59,59));
+
+
+            var dateSpec = BaseUserSpecification.createdBetween(startDate, endDate);
+
+            List<BaseUser> users = baseUserRepository.findAll(dateSpec);
+
+            log.info("Fetched {} users from DB for that range", users.size());
+            users.forEach(u -> log.info("User: {}, createdAt: {}, state: {}", u.getEmail(), u.getCreatedAt(), u.getState()));
+
+
+            Map<String, Long> stateUserCount = users.stream()
+                    .filter(u -> u.getState() != null && !u.getState().isBlank())
+                    .collect(Collectors.groupingBy(BaseUser::getState, Collectors.counting()));
+
+            long totalUsers = stateUserCount.values().stream().mapToLong(Long::longValue).sum();
+
+            List<Map<String, Object>> stateStats = stateUserCount.entrySet().stream()
+                    .map(entry -> {
+                        String state = entry.getKey();
+                        long count = entry.getValue();
+                        double percentage = totalUsers > 0 ? (count * 100.0 / totalUsers) : 0.0;
+                        Map<String, Object> map = new HashMap<>();
+                        map.put("state", state);
+                        map.put("users", count);
+                        map.put("percentage", String.format("%.2f%%", percentage));
+                        return map;
+                    })
+                    .sorted((a, b) -> Long.compare((Long) b.get("users"), (Long) a.get("users")))
+                    .collect(Collectors.toList());
+
+            return ResponseEntity.ok(ResponseUtils.createSuccessResponse(stateStats,"User distribution fetched successfully"));
+
+        }catch (Exception ex) {
+            return ResponseEntity.internalServerError()
+                    .body(ResponseUtils.createFailureResponse("Server error", ex.getMessage()));
+        }
+
+
     }
 
 

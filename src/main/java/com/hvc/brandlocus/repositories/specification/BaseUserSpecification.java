@@ -18,6 +18,10 @@ public class BaseUserSpecification {
             );
         };
     }
+    public static Specification<BaseUser> hasState(String state) {
+        return (root, query, cb) -> state == null ? cb.conjunction() :
+                cb.equal(cb.lower(root.get("state")), state.toLowerCase());
+    }
 
     public static Specification<BaseUser> createdBetween(LocalDate startDate, LocalDate endDate) {
         return (root, query, cb) -> {
