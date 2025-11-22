@@ -56,6 +56,17 @@
 <!--			<artifactId>spring-ai-starter-model-openai</artifactId>-->
 <!--		</dependency>-->
 
+
+
+<!--		<dependency>-->
+<!--			<groupId>com.theokanning.openai-gpt3-java</groupId>-->
+<!--			<artifactId>client</artifactId>-->
+<!--			<version>0.11.0</version>-->
+<!--		</dependency>-->
+
+
+
+
 		<dependency>
 			<groupId>com.cloudinary</groupId>
 			<artifactId>cloudinary-http44</artifactId>
@@ -132,7 +143,15 @@
 			<artifactId>spring-security-test</artifactId>
 			<scope>test</scope>
 		</dependency>
+
+		<dependency>
+			<groupId>com.openai</groupId>
+			<artifactId>openai-java</artifactId>
+			<version>4.0.0</version>
+		</dependency>
 	</dependencies>
+
+
 	<dependencyManagement>
 		<dependencies>
 			<dependency>

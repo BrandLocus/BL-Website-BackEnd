@@ -88,7 +88,8 @@ public class UserServiceImpl implements UserService {
             Specification<BaseUser> spec = Specification.allOf(
                     BaseUserSpecification.searchTerm(searchTerm),
                     BaseUserSpecification.byTimeFilter(timeFilter),
-                    BaseUserSpecification.createdBetween(start, end)
+                    BaseUserSpecification.createdBetween(start, end),
+                    BaseUserSpecification.excludeAdmin()
             );
 
 

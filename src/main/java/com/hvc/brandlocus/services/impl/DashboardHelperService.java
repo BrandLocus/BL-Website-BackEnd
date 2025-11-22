@@ -1,16 +1,16 @@
 package com.hvc.brandlocus.services.impl;
 
 import com.hvc.brandlocus.dto.response.ChartPoint;
+import com.hvc.brandlocus.entities.BaseUser;
 import com.hvc.brandlocus.repositories.BaseUserRepository;
 import com.hvc.brandlocus.repositories.ChatMessageRepository;
 import com.hvc.brandlocus.repositories.specification.BaseUserSpecification;
 import com.hvc.brandlocus.repositories.specification.ChatMessageSpecification;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.YearMonth;
+import java.time.*;
 import java.time.format.DateTimeFormatter;
 import java.time.format.TextStyle;
 import java.util.ArrayList;
@@ -24,8 +24,10 @@ public class DashboardHelperService {
     private final BaseUserRepository baseUserRepository;
     private final ChatMessageRepository chatMessageRepository;
 
-
-    public List<ChartPoint> buildChartData(String filter, LocalDate startDate, LocalDate endDate) {
+    /**
+     * Build chart data while applying any additional specifications (e.g., excludeAdmin).
+     */
+    public List<ChartPoint> buildChartData(String filter, LocalDate startDate, LocalDate endDate, Specification<BaseUser> additionalSpec) {
         List<ChartPoint> chartData = new ArrayList<>();
 
         LocalDateTime now = LocalDateTime.now();
@@ -34,19 +36,19 @@ public class DashboardHelperService {
 
         switch (filter.toLowerCase()) {
             case "24hrs":
-                chartData = buildHourlyChart(start, end);
+                chartData = buildHourlyChart(start, end, additionalSpec);
                 break;
             case "7days":
-                chartData = buildWeeklyChart(start, end);
+                chartData = buildWeeklyChart(start, end, additionalSpec);
                 break;
             case "30days":
-                chartData = buildDailyChart(start, end);
+                chartData = buildDailyChart(start, end, additionalSpec);
                 break;
             case "12months":
-                chartData = buildMonthlyChart(start, end);
+                chartData = buildMonthlyChart(start, end, additionalSpec);
                 break;
             default:
-                chartData = buildYearlyChart(start, end);
+                chartData = buildYearlyChart(start, end, additionalSpec);
                 break;
         }
 
@@ -66,15 +68,16 @@ public class DashboardHelperService {
         }
     }
 
-    private List<ChartPoint> buildHourlyChart(LocalDateTime start, LocalDateTime end) {
+    private List<ChartPoint> buildHourlyChart(LocalDateTime start, LocalDateTime end, Specification<BaseUser> additionalSpec) {
         List<ChartPoint> result = new ArrayList<>();
-
         for (int hour = 0; hour < 24; hour++) {
             LocalDateTime from = start.withHour(hour).withMinute(0);
             LocalDateTime to = from.plusHours(1);
 
-            long totalUsers = baseUserRepository.count(
-                    BaseUserSpecification.createdBetween(from.toLocalDate(), to.toLocalDate()));
+            Specification<BaseUser> spec = BaseUserSpecification.createdBetween(from.toLocalDate(), to.toLocalDate())
+                    .and(additionalSpec);
+
+            long totalUsers = baseUserRepository.count(spec);
             long totalConversations = chatMessageRepository.count(
                     ChatMessageSpecification.createdBetween(from.toLocalDate(), to.toLocalDate()));
 
@@ -84,19 +87,19 @@ public class DashboardHelperService {
                     .totalConversations(totalConversations)
                     .build());
         }
-
         return result;
     }
 
-    private List<ChartPoint> buildWeeklyChart(LocalDateTime start, LocalDateTime end) {
+    private List<ChartPoint> buildWeeklyChart(LocalDateTime start, LocalDateTime end, Specification<BaseUser> additionalSpec) {
         List<ChartPoint> result = new ArrayList<>();
-
         for (int i = 0; i < 7; i++) {
             LocalDate day = start.toLocalDate().plusDays(i);
-            String label = day.getDayOfWeek().getDisplayName(TextStyle.SHORT, Locale.ENGLISH); // Mon, Tue, Wed...
+            String label = day.getDayOfWeek().getDisplayName(TextStyle.SHORT, Locale.ENGLISH);
 
-            long totalUsers = baseUserRepository.count(BaseUserSpecification.createdOn(day));
-            long totalConversations = chatMessageRepository.count(ChatMessageSpecification.createdOn(day));
+            long totalUsers = baseUserRepository.count(
+                    BaseUserSpecification.createdOn(day).and(additionalSpec));
+            long totalConversations = chatMessageRepository.count(
+                    ChatMessageSpecification.createdOn(day));
 
             result.add(ChartPoint.builder()
                     .label(label)
@@ -104,19 +107,19 @@ public class DashboardHelperService {
                     .totalConversations(totalConversations)
                     .build());
         }
-
         return result;
     }
 
-    private List<ChartPoint> buildDailyChart(LocalDateTime start, LocalDateTime end) {
+    private List<ChartPoint> buildDailyChart(LocalDateTime start, LocalDateTime end, Specification<BaseUser> additionalSpec) {
         List<ChartPoint> result = new ArrayList<>();
-
         LocalDate current = start.toLocalDate();
         while (!current.isAfter(end.toLocalDate())) {
-            String label = current.format(DateTimeFormatter.ofPattern("MMM dd")); // e.g. Nov 01
+            String label = current.format(DateTimeFormatter.ofPattern("MMM dd"));
 
-            long totalUsers = baseUserRepository.count(BaseUserSpecification.createdOn(current));
-            long totalConversations = chatMessageRepository.count(ChatMessageSpecification.createdOn(current));
+            long totalUsers = baseUserRepository.count(
+                    BaseUserSpecification.createdOn(current).and(additionalSpec));
+            long totalConversations = chatMessageRepository.count(
+                    ChatMessageSpecification.createdOn(current));
 
             result.add(ChartPoint.builder()
                     .label(label)
@@ -126,13 +129,11 @@ public class DashboardHelperService {
 
             current = current.plusDays(1);
         }
-
         return result;
     }
 
-    private List<ChartPoint> buildMonthlyChart(LocalDateTime start, LocalDateTime end) {
+    private List<ChartPoint> buildMonthlyChart(LocalDateTime start, LocalDateTime end, Specification<BaseUser> additionalSpec) {
         List<ChartPoint> result = new ArrayList<>();
-
         YearMonth current = YearMonth.from(start);
         YearMonth endMonth = YearMonth.from(end);
 
@@ -140,10 +141,12 @@ public class DashboardHelperService {
             LocalDate firstDay = current.atDay(1);
             LocalDate lastDay = current.atEndOfMonth();
 
-            String label = current.getMonth().getDisplayName(TextStyle.FULL, Locale.ENGLISH); // January, February...
+            String label = current.getMonth().getDisplayName(TextStyle.FULL, Locale.ENGLISH);
 
-            long totalUsers = baseUserRepository.count(BaseUserSpecification.createdBetween(firstDay, lastDay));
-            long totalConversations = chatMessageRepository.count(ChatMessageSpecification.createdBetween(firstDay, lastDay));
+            long totalUsers = baseUserRepository.count(
+                    BaseUserSpecification.createdBetween(firstDay, lastDay).and(additionalSpec));
+            long totalConversations = chatMessageRepository.count(
+                    ChatMessageSpecification.createdBetween(firstDay, lastDay));
 
             result.add(ChartPoint.builder()
                     .label(label)
@@ -153,13 +156,11 @@ public class DashboardHelperService {
 
             current = current.plusMonths(1);
         }
-
         return result;
     }
 
-    private List<ChartPoint> buildYearlyChart(LocalDateTime start, LocalDateTime end) {
+    private List<ChartPoint> buildYearlyChart(LocalDateTime start, LocalDateTime end, Specification<BaseUser> additionalSpec) {
         List<ChartPoint> result = new ArrayList<>();
-
         int startYear = start.getYear();
         int endYear = end.getYear();
 
@@ -167,8 +168,10 @@ public class DashboardHelperService {
             LocalDate first = LocalDate.of(year, 1, 1);
             LocalDate last = LocalDate.of(year, 12, 31);
 
-            long totalUsers = baseUserRepository.count(BaseUserSpecification.createdBetween(first, last));
-            long totalConversations = chatMessageRepository.count(ChatMessageSpecification.createdBetween(first, last));
+            long totalUsers = baseUserRepository.count(
+                    BaseUserSpecification.createdBetween(first, last).and(additionalSpec));
+            long totalConversations = chatMessageRepository.count(
+                    ChatMessageSpecification.createdBetween(first, last));
 
             result.add(ChartPoint.builder()
                     .label(String.valueOf(year))
@@ -179,11 +182,4 @@ public class DashboardHelperService {
 
         return result;
     }
-
-
-
-
-
-
-
 }

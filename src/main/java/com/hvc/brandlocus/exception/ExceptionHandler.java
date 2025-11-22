@@ -2,9 +2,11 @@ package com.hvc.brandlocus.exception;
 
 
 import com.hvc.brandlocus.utils.ApiResponse;
+import com.openai.errors.OpenAIException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.validation.BindingResult;
@@ -118,6 +120,21 @@ public class ExceptionHandler {
                 .error(ex.getMessage())
                 .build();
         return new ResponseEntity<>(response, BAD_REQUEST);
+    }
+
+    @org.springframework.web.bind.annotation.ExceptionHandler(value = OpenAIException.class)
+    public ResponseEntity<?> handleOpenAIException(OpenAIException ex) {
+        log.error("OpenAI service error: {}", ex.getMessage());
+
+        var response = ApiResponse.builder()
+                .referenceId(UUID.randomUUID().toString())
+                .requestTime(LocalDateTime.now())
+                .requestType("Outbound")
+                .message("AI service error")
+                .status(false)
+                .error(ex.getMessage())
+                .build();
+        return new ResponseEntity<>(response, HttpStatus.SERVICE_UNAVAILABLE);
     }
 
 

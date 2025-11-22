@@ -45,73 +45,107 @@ public class AdminDashboardImpl implements AdminDashboardService {
     private final DashboardHelperService dashboardHelperService;
 
     @Override
-    public ResponseEntity<ApiResponse<?>> adminDashboard(Principal principal, String filter, LocalDate startDate, LocalDate endDate) {
+    public ResponseEntity<ApiResponse<?>> adminDashboard(
+            Principal principal,
+            String filter,
+            LocalDate startDate,
+            LocalDate endDate
+    ) {
         try {
+            // NORMALIZE FILTER
+            String safeFilter = (filter == null ? "" : filter.trim().toLowerCase());
+
+            // USER VALIDATION
             Optional<BaseUser> optionalUser = baseUserRepository.findByEmail(principal.getName().trim());
             if (optionalUser.isEmpty()) {
                 return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                        .body(createFailureResponse("User not found", "User with email " + principal.getName() + " does not exist"));
+                        .body(ResponseUtils.createFailureResponse("User not found",
+                                "User with email " + principal.getName() + " does not exist"));
             }
+
             BaseUser admin = optionalUser.get();
 
             if (!UserRoles.ADMIN.getValue().equalsIgnoreCase(admin.getRole().getName())) {
                 return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                        .body(ResponseUtils.createFailureResponse("access denied", "only admins can access this resource"));
+                        .body(ResponseUtils.createFailureResponse("access denied",
+                                "only admins can access this resource"));
             }
 
             LocalDateTime now = LocalDateTime.now();
-            LocalDateTime from = resolveStartDate(filter, startDate, endDate, now);
+            LocalDateTime from = resolveStartDate(safeFilter, startDate, endDate, now);
 
-            // Previous comparison range (for % change)
+            // PREVIOUS RANGE
             LocalDateTime compareFrom = null;
             LocalDateTime compareTo = null;
-            if (!"alltime".equalsIgnoreCase(filter) && startDate == null && endDate == null) {
+
+            // ----------- FIX FOR DATE RANGE MODE ---------------
+            if (startDate != null && endDate != null) {
+                long days = Duration.between(
+                        startDate.atStartOfDay(),
+                        endDate.atTime(23, 59, 59)
+                ).toDays();
+
+                compareFrom = startDate.minusDays(days + 1).atStartOfDay();
+                compareTo = startDate.minusDays(1).atTime(23, 59, 59);
+            }
+            // ----------------------------------------------------
+
+            // FOR FILTER MODE (no custom date range)
+            if (!"alltime".equals(safeFilter) && startDate == null && endDate == null) {
                 Duration duration = Duration.between(from, now);
                 compareTo = from.minusSeconds(1);
                 compareFrom = from.minus(duration);
             }
 
-            // ✅ Build specifications
-            Specification<BaseUser> userSpec = BaseUserSpecification.byTimeFilter(filter);
-            Specification<ChatMessage> chatSpec = ChatMessageSpecification.byTimeFilter(filter);
+            // SPECIFICATIONS
+            Specification<BaseUser> userSpec;
+            Specification<ChatMessage> chatSpec;
 
             if (startDate != null && endDate != null) {
-                userSpec = BaseUserSpecification.createdBetween(startDate, endDate);
+                // DATE RANGE MODE
+                userSpec = BaseUserSpecification.createdBetween(startDate, endDate)
+                        .and(BaseUserSpecification.excludeAdmin());
+
                 chatSpec = ChatMessageSpecification.createdBetween(startDate, endDate);
+            } else {
+                // FILTER MODE
+                userSpec = BaseUserSpecification.byTimeFilter(safeFilter)
+                        .and(BaseUserSpecification.excludeAdmin());
+
+                chatSpec = ChatMessageSpecification.byTimeFilter(safeFilter);
             }
 
-
-            // ✅ Compute totals using specification
+            // TOTAL COUNTS
             long totalUsers = baseUserRepository.count(userSpec);
             long totalConversations = chatMessageRepository.count(chatSpec);
 
-            // ✅ Active users
-            Specification<BaseUser> activeUserSpec = userSpec.and((root, query, cb) -> cb.isTrue(root.get("isActive")));
-            long activeUsers = baseUserRepository.count(activeUserSpec);
+            // ACTIVE USERS
+            long activeUsers = baseUserRepository.count(
+                    userSpec.and((root, query, cb) -> cb.isTrue(root.get("isActive")))
+            );
 
-            // ✅ Compute % changes
+            // PERCENTAGE CHANGE
             Double userChange = null;
             Double chatChange = null;
 
             if (compareFrom != null && compareTo != null) {
-                // Use your existing createdBetween specification
-                Specification<BaseUser> prevUserSpec = BaseUserSpecification.createdBetween(compareFrom.toLocalDate(), compareTo.toLocalDate());
-                Specification<ChatMessage> prevChatSpec = ChatMessageSpecification.createdBetween(compareFrom.toLocalDate(), compareTo.toLocalDate());
+                long prevUsers = baseUserRepository.count(
+                        BaseUserSpecification.createdBetween(compareFrom.toLocalDate(), compareTo.toLocalDate())
+                                .and(BaseUserSpecification.excludeAdmin())
+                );
 
-                long prevUsers = baseUserRepository.count(prevUserSpec);
-                long prevChats = chatMessageRepository.count(prevChatSpec);
+                long prevChats = chatMessageRepository.count(
+                        ChatMessageSpecification.createdBetween(compareFrom.toLocalDate(), compareTo.toLocalDate())
+                );
 
                 userChange = calculatePercentageChange(prevUsers, totalUsers);
                 chatChange = calculatePercentageChange(prevChats, totalConversations);
             }
 
+            // CHART DATA
+            List<ChartPoint> chartData =
+                    dashboardHelperService.buildChartData(safeFilter, startDate, endDate, BaseUserSpecification.excludeAdmin());
 
-
-
-            // ✅ Chart data (will depend on filter granularity)
-            List<ChartPoint> chartData = dashboardHelperService.buildChartData(filter, startDate, endDate);
-
-            // ✅ Build response DTO
             DashboardResponse dashboard = DashboardResponse.builder()
                     .totalConversations(totalConversations)
                     .activeUsers(activeUsers)
@@ -120,14 +154,17 @@ public class AdminDashboardImpl implements AdminDashboardService {
                     .chartData(chartData)
                     .build();
 
-            return ResponseEntity.ok(ResponseUtils.createSuccessResponse(dashboard,"Dashboard data fetched successfully"));
+            return ResponseEntity.ok(ResponseUtils.createSuccessResponse(dashboard,
+                    "Dashboard data fetched successfully"));
 
-
-        }catch (Exception ex) {
+        } catch (Exception ex) {
             return ResponseEntity.internalServerError()
                     .body(ResponseUtils.createFailureResponse("Server error", ex.getMessage()));
         }
     }
+
+
+
 
     @Override
     public ResponseEntity<ApiResponse<?>> userGraph(Principal principal, LocalDate startDate, LocalDate endDate) {
@@ -210,9 +247,12 @@ public class AdminDashboardImpl implements AdminDashboardService {
     }
 
     private double calculatePercentageChange(long previous, long current) {
-        if (previous == 0) return 0;
+        if (previous == 0) {
+            return current > 0 ? 100.0 : 0.0;
+        }
         return ((double) (current - previous) / previous) * 100;
     }
+
 
 
 }

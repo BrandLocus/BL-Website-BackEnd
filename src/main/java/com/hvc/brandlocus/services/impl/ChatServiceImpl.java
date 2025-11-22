@@ -45,6 +45,8 @@ public class ChatServiceImpl implements AIChatService {
     private final ChatSessionRepository chatSessionRepository;
     private final BaseUserRepository baseUserRepository;
 
+    private final OpenAIService openAIService;
+
 
     @Override
     public ResponseEntity<ApiResponse<?>> startChat(Principal principal, ChatMessageRequest request) {
@@ -72,6 +74,8 @@ public class ChatServiceImpl implements AIChatService {
                         .orElseThrow(() -> new IllegalArgumentException("Session not found"));
             }
 
+            List<ChatMessage> chatHistory = chatMessageRepository.findByChatSessionOrderByCreatedAtAsc(session);
+
             ChatMessage userMessage = chatMessageRepository.save(
                     ChatMessage.builder()
                             .chatSession(session)
@@ -83,31 +87,23 @@ public class ChatServiceImpl implements AIChatService {
 
             log.info("User message saved, session ID: {}", session.getId());
 
-            // 4. Prepare AI request
-            // AIChatMessageRequest aiRequest = new AIChatMessageRequest(
-            //         user.getName(),
-            //         session.getId().toString(),
-            //         request.getContent()
-            // );
 
-            // 5. Call AI (commented out)
-            // AIChatMessageResponse aiResponse = aiChatClient.aiChat(aiRequest);
+            String aiAnswer = openAIService.getResponseWithHistory(chatHistory, request.getContent());
 
-            // 6. Simulate AI response
-            String simulatedAIAnswer = "This is a simulated AI response"; // replace with real AI response
-
-            // 7. Save AI message
+            // Save AI message
             ChatMessage aiMessage = chatMessageRepository.save(
                     ChatMessage.builder()
                             .chatSession(session)
                             .sender(SenderType.AI)
                             .chatType(ChatType.PROMPT_RESPONSE)
-//                            .status(ChatStatus.NEED_REVIEW.getValue())
-                            .content(simulatedAIAnswer)
+                            .content(aiAnswer)
                             .build()
             );
 
-            // 8. Build response objects
+            log.info("User message saved, session ID: {}", session.getId());
+            log.info("Chat history size: {}", chatHistory.size());
+
+
             ChatMessageResponse userMessageResponse = ChatMessageResponse.builder()
                     .sessionId(session.getId())
                     .messageId(userMessage.getId())

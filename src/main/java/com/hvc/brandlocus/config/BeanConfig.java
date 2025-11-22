@@ -2,7 +2,10 @@ package com.hvc.brandlocus.config;
 
 
 import com.hvc.brandlocus.repositories.BaseUserRepository;
+import com.openai.client.OpenAIClient;
+import com.openai.client.okhttp.OpenAIOkHttpClient;
 import com.sendgrid.SendGrid;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -47,8 +50,14 @@ public class BeanConfig {
     @Value("${spring.mail.protocol}")
     private String protocol;
 
+    @Value("${openai.api.key}")
+    private String apiKey;
 
-        @Bean
+
+
+
+
+    @Bean
         CorsConfigurationSource corsConfigurationSource(){
         final UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         CorsConfiguration corsConfiguration = new CorsConfiguration().applyPermitDefaultValues();
@@ -119,5 +128,16 @@ public class BeanConfig {
 
         return mailSender;
     }
+
+
+    @Bean
+    public OpenAIClient openAIClient(@Value("${openai.api.key}") String apiKey) {
+        return OpenAIOkHttpClient.builder()
+                .apiKey(apiKey)
+                .build();
+    }
+
+
+
 
 }

@@ -1,12 +1,22 @@
 package com.hvc.brandlocus.repositories.specification;
 
 import com.hvc.brandlocus.entities.BaseUser;
+import com.hvc.brandlocus.enums.UserRoles;
 import org.springframework.data.jpa.domain.Specification;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 public class BaseUserSpecification {
+
+    public static Specification<BaseUser> excludeAdmin() {
+        return (root, query, cb) -> cb.notEqual(
+                cb.lower(root.get("role").get("name")), "admin"
+        );
+    }
+
+
+
     public static Specification<BaseUser> searchTerm(String term) {
         return (root, query, cb) -> {
             if (term == null || term.isEmpty()) return null;
@@ -32,33 +42,29 @@ public class BaseUserSpecification {
     }
 
     public static Specification<BaseUser> byTimeFilter(String filter) {
-        if (filter == null) return null;
+        if (filter == null || filter.isEmpty())
+            return (root, query, cb) -> cb.conjunction();
 
+        String f = filter.toLowerCase();
         LocalDateTime now = LocalDateTime.now();
         LocalDateTime from;
 
-        switch (filter.toLowerCase()) {
-            case "12months":
-                from = now.minusMonths(12);
-                break;
-            case "30days":
-                from = now.minusDays(30);
-                break;
-            case "7days":
-                from = now.minusDays(7);
-                break;
-            case "24hrs":
-                from = now.minusHours(24);
-                break;
+        switch (f) {
+            case "12months": from = now.minusMonths(12); break;
+            case "30days":   from = now.minusDays(30);   break;
+            case "7days":    from = now.minusDays(7);    break;
+            case "24hrs":    from = now.minusHours(24);  break;
             case "alltime":
                 return (root, query, cb) -> cb.conjunction();
             default:
-                return null;
+                return (root, query, cb) -> cb.conjunction();
         }
 
         LocalDateTime finalFrom = from;
         return (root, query, cb) -> cb.between(root.get("createdAt"), finalFrom, now);
     }
+
+
 
     public static Specification<BaseUser> createdOn(LocalDate date) {
         return (root, query, cb) -> {
