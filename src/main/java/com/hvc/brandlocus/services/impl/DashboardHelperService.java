@@ -162,7 +162,7 @@ public class DashboardHelperService {
     private List<ChartPoint> buildYearlyChart(LocalDateTime start, LocalDateTime end, Specification<BaseUser> additionalSpec) {
         List<ChartPoint> result = new ArrayList<>();
         int startYear = start.getYear();
-        int endYear = end.getYear();
+        int endYear = end.getYear() + 5;
 
         for (int year = startYear; year <= endYear; year++) {
             LocalDate first = LocalDate.of(year, 1, 1);

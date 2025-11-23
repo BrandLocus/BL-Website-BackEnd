@@ -13,6 +13,8 @@ public interface UserService {
             Long userId,
             String searchTerm,
             String timeFilter,
+            String state,
+            String country,
             String startDate,
             String endDate,
             PaginationRequest paginationRequest

@@ -26,6 +26,8 @@ public class UserController {
             @RequestParam(required = false) Long userId,
             @RequestParam(required = false) String searchTerm,
             @RequestParam(required = false, defaultValue = "alltime") String timeFilter, // alltime, 12months, 30days, 7days, 24hrs
+            @RequestParam(required = false) String state, // yyyy-MM-dd
+            @RequestParam(required = false) String country,
             @RequestParam(required = false) String startDate, // yyyy-MM-dd
             @RequestParam(required = false) String endDate,   // yyyy-MM-dd
             @RequestParam(defaultValue = "0") int page,
@@ -33,6 +35,7 @@ public class UserController {
             @RequestParam(defaultValue = "createdAt") String sortBy,
             @RequestParam(defaultValue = "desc") String order
     ) {
+
         PaginationRequest paginationRequest = PaginationRequest.builder()
                 .page(page)
                 .limit(limit)
@@ -45,6 +48,8 @@ public class UserController {
                 userId,
                 searchTerm,
                 timeFilter,
+                state,
+                country,
                 startDate,
                 endDate,
                 paginationRequest

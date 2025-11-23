@@ -1,5 +1,6 @@
 package com.hvc.brandlocus.controllers.form;
 
+import com.hvc.brandlocus.dto.request.AdminFormReplyRequest;
 import com.hvc.brandlocus.dto.request.CreateFormRequest;
 import com.hvc.brandlocus.dto.request.PaginationRequest;
 import com.hvc.brandlocus.enums.ServiceNeeded;
@@ -62,6 +63,21 @@ public class FormController {
                 .toList();
 
         return ResponseEntity.ok(services);
+    }
+
+    @PatchMapping("/{formId}/reply")
+    public ResponseEntity<ApiResponse<?>> replyToForm(
+            Principal principal,
+            @PathVariable Long formId,
+            @RequestBody AdminFormReplyRequest replyRequest) {
+        return formService.replyToForm(principal, formId, replyRequest);
+    }
+
+    @GetMapping("/{formId}")
+    public ResponseEntity<ApiResponse<?>> getFormById(
+            Principal principal,
+            @PathVariable Long formId) {
+        return formService.getFormById(principal, formId);
     }
 
 }

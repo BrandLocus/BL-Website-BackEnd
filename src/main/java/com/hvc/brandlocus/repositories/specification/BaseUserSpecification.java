@@ -29,8 +29,17 @@ public class BaseUserSpecification {
         };
     }
     public static Specification<BaseUser> hasState(String state) {
-        return (root, query, cb) -> state == null ? cb.conjunction() :
-                cb.equal(cb.lower(root.get("state")), state.toLowerCase());
+        return (root, query, cb) -> {
+            if (state == null || state.isEmpty()) return null;
+            return cb.equal(cb.lower(root.get("state")), state.toLowerCase());
+        };
+    }
+
+    public static Specification<BaseUser> hasCountry(String country) {
+        return (root, query, cb) -> {
+            if (country == null || country.isEmpty()) return null;
+            return cb.equal(cb.lower(root.get("country")), country.toLowerCase());
+        };
     }
 
     public static Specification<BaseUser> createdBetween(LocalDate startDate, LocalDate endDate) {

@@ -2,6 +2,7 @@ package com.hvc.brandlocus.repositories.specification;
 
 import com.hvc.brandlocus.entities.BaseUser;
 import com.hvc.brandlocus.entities.Forms;
+import com.hvc.brandlocus.enums.ServiceNeeded;
 import org.springframework.data.jpa.domain.Specification;
 
 import java.time.LocalDate;
@@ -12,7 +13,6 @@ public class FormSpecification {
     public static Specification<Forms> isActiveForm() {
         return (root, query, cb) -> cb.isTrue(root.get("isActive"));
     }
-
 
     public static Specification<Forms> searchTerm(String term) {
         return (root, query, cb) -> {
@@ -27,10 +27,16 @@ public class FormSpecification {
         };
     }
 
-    public static Specification<Forms> filterByIndustry(String filterTerm) {
+    public static Specification<Forms> filterByServiceNeeded(String filterTerm) {
         return (root, query, cb) -> {
             if (filterTerm == null || filterTerm.isEmpty()) return cb.conjunction();
-            return cb.equal(cb.lower(root.get("industryName")), filterTerm.toLowerCase());
+
+            try {
+                ServiceNeeded serviceNeeded = ServiceNeeded.fromString(filterTerm);
+                return cb.equal(root.get("serviceNeeded"), serviceNeeded);
+            } catch (IllegalArgumentException e) {
+                return cb.disjunction();
+            }
         };
     }
 
@@ -78,8 +84,6 @@ public class FormSpecification {
         }
         return from;
     }
-
-
 
     public static Specification<Forms> createdBetween(LocalDate startDate, LocalDate endDate) {
         return (root, query, cb) -> {

@@ -71,6 +71,12 @@ public class AdminDashboardImpl implements AdminDashboardService {
                                 "only admins can access this resource"));
             }
 
+            // VALIDATE DATE RANGE WITH TIME FILTER
+            ResponseEntity<ApiResponse<?>> validationResponse = validateDateRangeWithTimeFilter(safeFilter, startDate, endDate);
+            if (validationResponse != null) {
+                return validationResponse;
+            }
+
             LocalDateTime now = LocalDateTime.now();
             LocalDateTime from = resolveStartDate(safeFilter, startDate, endDate, now);
 
@@ -230,6 +236,77 @@ public class AdminDashboardImpl implements AdminDashboardService {
         }
 
 
+    }
+
+    private ResponseEntity<ApiResponse<?>> validateDateRangeWithTimeFilter(
+            String timeFilter,
+            LocalDate startDate,
+            LocalDate endDate) {
+
+        // If no custom date range provided, no validation needed
+        if (startDate == null || endDate == null) {
+            return null; // Valid, proceed
+        }
+
+        // If "alltime" filter, custom date range is allowed
+        if ("alltime".equalsIgnoreCase(timeFilter)) {
+            return null; // Valid, proceed
+        }
+
+        LocalDate now = LocalDate.now();
+        LocalDate allowedStart;
+        String filterDescription;
+
+        switch (timeFilter.toLowerCase()) {
+            case "24hrs":
+                allowedStart = now.minusDays(1);
+                filterDescription = "24 hours (last 1 day)";
+                break;
+            case "7days":
+                allowedStart = now.minusDays(7);
+                filterDescription = "7 days";
+                break;
+            case "30days":
+                allowedStart = now.minusDays(30);
+                filterDescription = "30 days";
+                break;
+            case "12months":
+                allowedStart = now.minusMonths(12);
+                filterDescription = "12 months";
+                break;
+            default:
+                return null; // No filter, proceed
+        }
+
+        // Check if custom start date is before the allowed range
+        if (startDate.isBefore(allowedStart)) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(ResponseUtils.createFailureResponse(
+                            "Invalid date range",
+                            "When using '" + timeFilter + "' filter, date range must be within " + filterDescription +
+                                    ". Allowed start date: " + allowedStart + ", but got: " + startDate
+                    ));
+        }
+
+        // Check if end date is in the future
+        if (endDate.isAfter(now)) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(ResponseUtils.createFailureResponse(
+                            "Invalid date range",
+                            "End date cannot be in the future. Today is: " + now
+                    ));
+        }
+
+        // Check if start date is after end date
+        if (startDate.isAfter(endDate)) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(ResponseUtils.createFailureResponse(
+                            "Invalid date range",
+                            "Start date must be before end date"
+                    ));
+        }
+
+        return null; // Valid, proceed
     }
 
 

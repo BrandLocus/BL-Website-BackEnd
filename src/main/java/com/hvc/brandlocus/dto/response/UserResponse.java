@@ -30,4 +30,7 @@ public class UserResponse {
     private String profileImageUrl;
 
     private String role;
+
+    private String state;
+    private String country;
 }

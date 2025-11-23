@@ -39,6 +39,8 @@ public class UserServiceImpl implements UserService {
             Long userId,
             String searchTerm,
             String timeFilter,
+            String state,
+            String country,
             String startDate,
             String endDate,
             PaginationRequest paginationRequest
@@ -62,6 +64,8 @@ public class UserServiceImpl implements UserService {
                         .businessName(user.getBusinessName())
                         .profileImageUrl(user.getProfileImageUrl())
                         .role(user.getRole() != null ? user.getRole().getName() : null)
+                        .state(user.getState())
+                        .country(user.getCountry())
                         .build();
 
                 return ResponseEntity.ok(createSuccessResponse(userResponse, "User fetched successfully"));
@@ -88,6 +92,8 @@ public class UserServiceImpl implements UserService {
             Specification<BaseUser> spec = Specification.allOf(
                     BaseUserSpecification.searchTerm(searchTerm),
                     BaseUserSpecification.byTimeFilter(timeFilter),
+                    BaseUserSpecification.hasState(state),           // Add this
+                    BaseUserSpecification.hasCountry(country),
                     BaseUserSpecification.createdBetween(start, end),
                     BaseUserSpecification.excludeAdmin()
             );
@@ -104,6 +110,8 @@ public class UserServiceImpl implements UserService {
                             .businessName(user.getBusinessName())
                             .profileImageUrl(user.getProfileImageUrl())
                             .role(user.getRole() != null ? user.getRole().getName() : null)
+                            .state(user.getState())
+                            .country(user.getCountry())
                             .build()
                     )
                     .toList();
