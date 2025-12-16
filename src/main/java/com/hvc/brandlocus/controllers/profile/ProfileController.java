@@ -24,7 +24,7 @@ public class ProfileController {
         return profileService.getUserProfile(principal);
     }
 
-    @GetMapping("/update")
+    @PatchMapping("/update")
     public ResponseEntity<ApiResponse<?>> updateUserProfile(Principal principal,@RequestBody UpdateProfileRequest request){
         return profileService.updateProfile(principal, request);
     }

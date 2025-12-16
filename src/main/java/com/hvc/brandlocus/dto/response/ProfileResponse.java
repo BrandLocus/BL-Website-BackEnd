@@ -14,6 +14,7 @@ public class ProfileResponse {
     private String email;
     private String industryName;
     private String businessName;
+    private String businessBrief;
     private String country;
     private String state;
     private String role;

@@ -10,9 +10,9 @@ import lombok.*;
 @NoArgsConstructor
 @Builder
 public class CompletePasswordReset {
-    @NotNull(message = "email required")
-    @NotBlank(message = "email required")
-    private String email;
+    @NotNull(message = "otp required")
+    @NotBlank(message = "otp required")
+    private String otp;
 
     @NotNull(message = "password required")
     @NotBlank(message = "password required")

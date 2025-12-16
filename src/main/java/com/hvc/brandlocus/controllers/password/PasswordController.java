@@ -25,8 +25,8 @@ public class PasswordController {
         return passwordService.changePassword(principal,changePasswordRequest);
     }
 
-    @PostMapping("/reset")
-    public ResponseEntity<ApiResponse<?>> completePasswordReset(@RequestBody CompletePasswordReset completePasswordReset){
-        return passwordService.completePasswordReset(completePasswordReset);
-    }
+//    @PostMapping("/reset")
+//    public ResponseEntity<ApiResponse<?>> completePasswordReset(@RequestBody CompletePasswordReset completePasswordReset){
+//        return passwordService.completePasswordReset(completePasswordReset);
+//    }
 }

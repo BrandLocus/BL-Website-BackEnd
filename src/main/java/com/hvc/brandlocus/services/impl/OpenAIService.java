@@ -1,5 +1,7 @@
 package com.hvc.brandlocus.services.impl;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.hvc.brandlocus.dto.request.MessageClassification;
 import com.hvc.brandlocus.entities.ChatMessage;
 import com.hvc.brandlocus.enums.SenderType;
 import com.hvc.brandlocus.exception.OpenAIException;
@@ -32,26 +34,45 @@ public class OpenAIService {
         return chatCompletion.choices().getFirst().message().content().orElse("");
     }
 
-    public String getResponseWithHistory(List<ChatMessage> chatHistory, String userInput) {
+    public String getResponseWithHistory(
+            List<ChatMessage> chatHistory,
+            String userInput,
+            String businessBrief,
+            String businessName,
+            String industryName,
+            String userName
+    ) {
         try {
             log.info("Calling OpenAI with {} history messages", chatHistory.size());
 
+            // Build the personalization context
+            String personalizationContext = """
+            You are a helpful assistant for BrandLocus, a business/marketing platform.
+
+            PERSONALIZATION CONTEXT:
+            - User Name: %s
+            - Business Name: %s
+            - Industry: %s
+            - Business Brief: %s
+
+            IMPORTANT: Use the above information to personalize all responses. 
+            Do NOT give generic answers. Tailor insights, suggestions, and recommendations to this user and their business.
+            
+            Only answer questions related to business, marketing, branding, and product management.
+            If a user asks about unrelated topics (politics, sports, cooking, etc.), politely decline and redirect them to business-related topics.
+            Always be professional and helpful.
+        """.formatted(
+                    userName != null ? userName : "N/A",
+                    businessName != null ? businessName : "N/A",
+                    industryName != null ? industryName : "N/A",
+                    businessBrief != null ? businessBrief : "N/A"
+            );
+
             ChatCompletionCreateParams.Builder paramsBuilder = ChatCompletionCreateParams.builder()
-                    .addDeveloperMessage("""
-                    You are a helpful assistant for BrandLocus, a business/marketing platform.
-                    
-                    IMPORTANT RULES:
-                    - Only answer questions related to business, marketing, branding, and product management.
-                    - If a user asks about unrelated topics (politics, sports, cooking, etc.), politely decline and redirect them to business-related topics.
-                    - Always be professional and helpful.
-                    - Remember the conversation history and user details.
-                    
-                    Example responses for off-topic questions:
-                    - "I'm focused on helping with business and marketing topics. Is there anything related to your brand or business I can help with?"
-                    - "That's outside my area of expertise. I'm here to help with branding, marketing, and business strategies. How can I assist you with those?"
-                    """)
+                    .addDeveloperMessage(personalizationContext)
                     .model(ChatModel.GPT_4O_MINI);
 
+            // Add chat history
             for (ChatMessage msg : chatHistory) {
                 if (msg.getSender() == SenderType.USER) {
                     paramsBuilder.addUserMessage(msg.getContent());
@@ -60,6 +81,7 @@ public class OpenAIService {
                 }
             }
 
+            // Add current user input
             paramsBuilder.addUserMessage(userInput);
 
             ChatCompletion chatCompletion = openAIClient.chat().completions().create(paramsBuilder.build());
@@ -72,22 +94,108 @@ public class OpenAIService {
         }
     }
 
-//    public String getResponseWithHistory(List<ChatMessage> chatHistory, String userInput) {
-//        System.out.println("!!! HARDCODE TEST METHOD CALLED !!!");  // Add this
-//
-//        ChatCompletionCreateParams.Builder paramsBuilder = ChatCompletionCreateParams.builder()
-//                .addDeveloperMessage("You are a helpful assistant.")
-//                .model(ChatModel.GPT_4O_MINI);
-//
-//        paramsBuilder.addUserMessage("My name is David and I am from Nigeria");
-//        paramsBuilder.addAssistantMessage("Nice to meet you David from Nigeria!");
-//
-//        paramsBuilder.addUserMessage(userInput);
-//
-//        ChatCompletion chatCompletion = openAIClient.chat().completions().create(paramsBuilder.build());
-//
-//        return chatCompletion.choices().get(0).message().content().orElse("");
-//    }
 
 
-}
+
+
+    public MessageClassification classifyMessage(String text) {
+        try {
+            ChatCompletionCreateParams params = ChatCompletionCreateParams.builder()
+                    .model(ChatModel.GPT_4O_MINI)
+                    .addSystemMessage("""
+                    You are a classifier. Return ONLY a JSON object:
+                    {
+                      "sector": "<category>",
+                      "keywords": ["kw1","kw2","kw3"],
+                      "topic": "<one-word topic>"
+                    }
+                    
+                    Valid sectors:
+
+                    # Business Functional Sectors
+                    - Branding
+                    - Marketing
+                    - Advertising
+                    - Social Media Marketing
+                    - Sales
+                    - Customer Experience
+                    - Product Management
+                    - Product Design
+                    - Content Strategy
+                    - Business Strategy
+                    - Competitive Analysis
+                    - Operations
+                    - Human Resources
+                    - Data Analytics
+                    - Finance & Accounting
+                    - Pricing Strategy
+                    - Market Research
+                    - Project Management
+                    - Innovation
+                    - Growth Strategy
+                    - Customer Support
+                    - Leadership
+
+                    # Industry Sectors
+                    - Retail
+                    - E-commerce
+                    - FMCG
+                    - Technology
+                    - Software
+                    - SaaS
+                    - Fintech
+                    - Cybersecurity
+                    - AI / Machine Learning
+                    - Healthcare
+                    - Pharmaceuticals
+                    - Wellness
+                    - Logistics
+                    - Transportation
+                    - Supply Chain
+                    - Agriculture
+                    - Agritech
+                    - Food Production
+                    - Media & Entertainment
+                    - Gaming
+                    - Education
+                    - Real Estate
+                    - Manufacturing
+                    - Energy
+                    - Oil & Gas
+                    - Renewable Energy
+                    - Hospitality
+                    - Travel & Tourism
+                    - Legal
+                    - Nonprofit
+                    - Government
+                    - Fashion
+                    - Beauty
+
+                    - Off-topic
+                    """)
+                    .addUserMessage(text)
+                    .build();
+
+            ChatCompletion completion = openAIClient.chat().completions().create(params);
+            String json = completion.choices().getFirst().message().content().orElse("{}").trim();
+
+            ObjectMapper mapper = new ObjectMapper();
+            return mapper.readValue(json, MessageClassification.class);
+
+        } catch (Exception e) {
+            log.error("Failed to classify message: {}", e.getMessage(), e);
+
+            // Fallback to prevent nulls
+            MessageClassification fallback = new MessageClassification();
+            fallback.setSector("Unknown");
+            fallback.setKeywords(List.of());
+            fallback.setTopic("Unknown");
+            return fallback;
+        }
+    }
+    }
+
+
+
+
+

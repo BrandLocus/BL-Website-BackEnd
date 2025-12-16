@@ -12,6 +12,8 @@ public class UpdateProfileRequest {
     private String firstName;
     private String lastName;
     private String industryName;
-
     private String businessName;
+    private String businessBrief;
+    private String country;
+    private String state;
 }

@@ -30,4 +30,13 @@ public class ChatMessage extends BaseEntity {
 
     @Column(columnDefinition = "TEXT", nullable = false)
     private String content;
+
+    @Column(name = "sector")
+    private String sector;
+
+    @Column(name = "keywords", columnDefinition = "TEXT")
+    private String keywords;
+
+    @Column(name = "topic")
+    private String topic;
 }

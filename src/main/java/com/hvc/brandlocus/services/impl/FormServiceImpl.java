@@ -48,21 +48,21 @@ public class FormServiceImpl implements FormService {
 
 
     @Override
-    public ResponseEntity<ApiResponse<?>> submitForm(Principal principal,CreateFormRequest createFormRequest) {
+    public ResponseEntity<ApiResponse<?>> submitForm(CreateFormRequest createFormRequest) {
         try {
 
 
-            String email = principal.getName();
-            log.info("submit form for email: {}", email);
-
-            Optional<BaseUser> optionalUser = baseUserRepository.findByEmail(email);
-
-            if (optionalUser.isEmpty()) {
-                return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                        .body(createFailureResponse("User not found", "User does not exist"));
-            }
-
-            BaseUser user = optionalUser.get();
+//            String email = principal.getName();
+//            log.info("submit form for email: {}", email);
+//
+//            Optional<BaseUser> optionalUser = baseUserRepository.findByEmail(email);
+//
+//            if (optionalUser.isEmpty()) {
+//                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+//                        .body(createFailureResponse("User not found", "User does not exist"));
+//            }
+//
+//            BaseUser user = optionalUser.get();
 
             Forms form = Forms.builder()
                     .firstName(createFormRequest.getFirstName())
@@ -71,7 +71,7 @@ public class FormServiceImpl implements FormService {
                     .serviceNeeded(ServiceNeeded.valueOf(createFormRequest.getServiceNeeded()))
                     .companyName(createFormRequest.getCompanyName())
                     .message(createFormRequest.getMessage())
-                    .user(user)
+//                    .user(user)
                     .isActive(true)
                     .status(FormStatus.ACTIVE)
                     .build();
@@ -333,7 +333,7 @@ public class FormServiceImpl implements FormService {
     @Override
     public ResponseEntity<ApiResponse<?>> getFormById(Principal principal, Long formId) {
         try {
-            // USER VALIDATION
+
             Optional<BaseUser> optionalUser = baseUserRepository.findByEmail(principal.getName().trim());
             if (optionalUser.isEmpty()) {
                 return ResponseEntity.status(HttpStatus.NOT_FOUND)
@@ -343,7 +343,6 @@ public class FormServiceImpl implements FormService {
             BaseUser user = optionalUser.get();
             boolean isAdmin = user.getRole() != null && "ADMIN".equalsIgnoreCase(user.getRole().getName());
 
-            // FORM VALIDATION
             Optional<Forms> optionalForm = formRepository.findById(formId);
             if (optionalForm.isEmpty()) {
                 return ResponseEntity.status(HttpStatus.NOT_FOUND)
@@ -352,13 +351,13 @@ public class FormServiceImpl implements FormService {
 
             Forms form = optionalForm.get();
 
-            // AUTHORIZATION CHECK - Only admin or form owner can view
-            if (!isAdmin && !form.getUser().getId().equals(user.getId())) {
+            // AUTHORIZATION CHECK - Only admin
+            if (!isAdmin) {
                 return ResponseEntity.status(HttpStatus.FORBIDDEN)
                         .body(createFailureResponse("Access denied", "You do not have permission to view this form"));
             }
 
-            // BUILD RESPONSE
+
             FormResponse formResponse = FormResponse.builder()
                     .formId(form.getId())
                     .firstName(form.getFirstName())

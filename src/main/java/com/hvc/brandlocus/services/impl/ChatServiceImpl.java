@@ -2,6 +2,7 @@ package com.hvc.brandlocus.services.impl;
 
 import com.hvc.brandlocus.dto.request.ChatMessageRequest;
 import com.hvc.brandlocus.dto.request.EditAIResponseRequest;
+import com.hvc.brandlocus.dto.request.MessageClassification;
 import com.hvc.brandlocus.dto.request.PaginationRequest;
 import com.hvc.brandlocus.dto.response.ChatMessageResponse;
 import com.hvc.brandlocus.dto.response.PaginationResponse;
@@ -32,6 +33,7 @@ import org.springframework.stereotype.Service;
 import java.security.Principal;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static com.hvc.brandlocus.utils.ResponseUtils.createFailureResponse;
@@ -53,28 +55,35 @@ public class ChatServiceImpl implements AIChatService {
         try {
             log.info("Starting chat with the AI");
 
-            Optional<BaseUser> optionalUser = baseUserRepository.findByEmail(principal.getName().trim());
-            if (optionalUser.isEmpty()) {
-                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(
-                        createFailureResponse("User does not exist",
-                                "User with email " + principal.getName() + " not found")
-                );
-            }
-            BaseUser user = optionalUser.get();
+            BaseUser user = baseUserRepository.findByEmail(principal.getName().trim())
+                    .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+
+            user.setChatRequestCount(user.getChatRequestCount() + 1);
+
+            boolean milestoneReached = user.getChatRequestCount() % 5 == 0;
+
+            // Saving here triggers optimistic locking
+            baseUserRepository.save(user);
+
+//            String businessBrief = user.getProfile() != null ? user.getProfile().getBusinessBrief() : "";
+
 
             ChatSession session;
             if (request.getSessionId() == null) {
-                ChatSession newSession = ChatSession.builder()
-                        .user(user)
-                        .title(request.getTitle() != null ? request.getTitle() : "New Chat")
-                        .build();
-                session = chatSessionRepository.save(newSession);
+                session = chatSessionRepository.save(
+                        ChatSession.builder()
+                                .user(user)
+                                .title(request.getTitle() != null ? request.getTitle() : "New Chat")
+                                .build()
+                );
             } else {
                 session = chatSessionRepository.findById(request.getSessionId())
                         .orElseThrow(() -> new IllegalArgumentException("Session not found"));
             }
 
             List<ChatMessage> chatHistory = chatMessageRepository.findByChatSessionOrderByCreatedAtAsc(session);
+
 
             ChatMessage userMessage = chatMessageRepository.save(
                     ChatMessage.builder()
@@ -88,23 +97,35 @@ public class ChatServiceImpl implements AIChatService {
             log.info("User message saved, session ID: {}", session.getId());
 
 
-            String aiAnswer = openAIService.getResponseWithHistory(chatHistory, request.getContent());
+            String aiAnswer = openAIService.getResponseWithHistory(
+                    chatHistory,
+                    request.getContent(),
+                    user.getProfile() != null ? user.getProfile().getBusinessBrief() : "",
+                    user.getProfile() != null ? user.getProfile().getBusinessName() : "",
+                    user.getProfile() != null ? user.getProfile().getIndustryName() : "",
+                    user.getFirstName() + " " + user.getLastName()
+            );
 
-            // Save AI message
+
+            MessageClassification classification = openAIService.classifyMessage(aiAnswer);
+
+
             ChatMessage aiMessage = chatMessageRepository.save(
                     ChatMessage.builder()
                             .chatSession(session)
                             .sender(SenderType.AI)
                             .chatType(ChatType.PROMPT_RESPONSE)
                             .content(aiAnswer)
+                            .sector(classification.getSector())
+                            .keywords(String.join(", ", classification.getKeywords()))
+                            .topic(classification.getTopic())
                             .build()
             );
 
-            log.info("User message saved, session ID: {}", session.getId());
-            log.info("Chat history size: {}", chatHistory.size());
+            log.info("AI message saved with sector '{}' and keywords {}", classification.getSector(), classification.getKeywords());
 
-
-            ChatMessageResponse userMessageResponse = ChatMessageResponse.builder()
+            // -------------------------------
+            ChatMessageResponse userResponse = ChatMessageResponse.builder()
                     .sessionId(session.getId())
                     .messageId(userMessage.getId())
                     .userType(userMessage.getSender().toString())
@@ -113,29 +134,40 @@ public class ChatServiceImpl implements AIChatService {
                     .createdAt(userMessage.getCreatedAt().toString())
                     .build();
 
-            ChatMessageResponse aiMessageResponse = ChatMessageResponse.builder()
+            ChatMessageResponse aiResponse = ChatMessageResponse.builder()
                     .sessionId(session.getId())
                     .messageId(aiMessage.getId())
                     .userType(aiMessage.getSender().toString())
                     .chatType(aiMessage.getChatType().toString())
                     .content(aiMessage.getContent())
+                    .name(user.getFirstName() + " " + user.getLastName())
+                    .industryName(user.getIndustryName())
+                    .businessName(user.getBusinessName())
                     .createdAt(aiMessage.getCreatedAt().toString())
                     .build();
 
+//            return ResponseEntity.ok(
+//                    createSuccessResponse(List.of(userResponse, aiResponse), "Message processed successfully")
+//            );
+
             return ResponseEntity.ok(
                     createSuccessResponse(
-                            List.of(userMessageResponse, aiMessageResponse),
+                            Map.of(
+                                    "messages", List.of(userResponse, aiResponse),
+                                    "milestone", milestoneReached
+                            ),
                             "Message processed successfully"
                     )
             );
 
-        }catch (Exception ex) {
+
+        } catch (Exception ex) {
             log.error("Failed to process chat", ex);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
-                    createFailureResponse(ex.getLocalizedMessage(), "Failed to process chat")
-            );
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(createFailureResponse(ex.getLocalizedMessage(), "Failed to process chat"));
         }
     }
+
 
     @Override
     public ResponseEntity<ApiResponse<?>> getChats(
@@ -144,29 +176,39 @@ public class ChatServiceImpl implements AIChatService {
             PaginationRequest paginationRequest
     ) {
         try {
-            log.info("session id :{}",sessionId);
+            log.info("session id :{}", sessionId);
             Optional<BaseUser> optionalUser = baseUserRepository.findByEmail(principal.getName().trim());
             if (optionalUser.isEmpty()) {
                 return ResponseEntity.status(HttpStatus.NOT_FOUND)
                         .body(createFailureResponse("User not found", "User with email " + principal.getName() + " does not exist"));
             }
+
             BaseUser user = optionalUser.get();
+            boolean isAdmin = UserRoles.ADMIN.getValue().equalsIgnoreCase(user.getRole().getName());
 
             Sort.Direction direction = paginationRequest.getOrder().equalsIgnoreCase("asc") ?
                     Sort.Direction.ASC : Sort.Direction.DESC;
-            Pageable pageable = PageRequest.of(paginationRequest.getPage(),
-                    paginationRequest.getLimit(),
-                    Sort.by(direction, paginationRequest.getSortBy()));
 
+            Pageable pageable = PageRequest.of(
+                    paginationRequest.getPage(),
+                    paginationRequest.getLimit(),
+                    Sort.by(direction, paginationRequest.getSortBy())
+            );
+
+            // ================================
+            //       IF SESSION ID PROVIDED
+            // ================================
             if (sessionId != null) {
 
                 ChatSession session = chatSessionRepository.findById(sessionId)
                         .orElseThrow(() -> new IllegalArgumentException("Session not found"));
 
-                if (!session.getUser().getId().equals(user.getId())) {
+                // 🔒 If not admin, enforce ownership check
+                if (!isAdmin && !session.getUser().getId().equals(user.getId())) {
                     return ResponseEntity.status(HttpStatus.FORBIDDEN)
                             .body(createFailureResponse("Unauthorized", "You do not have access to this session"));
                 }
+
                 Page<ChatMessage> messagePage = chatMessageRepository.findAllByChatSessionId(sessionId, pageable);
 
                 List<ChatMessageResponse> messages = messagePage.getContent().stream()
@@ -190,33 +232,41 @@ public class ChatServiceImpl implements AIChatService {
                         .build();
 
                 return ResponseEntity.ok(createSuccessResponse(response, "Messages fetched successfully"));
-
-            } else {
-                Page<ChatSession> sessionPage = chatSessionRepository.findAllByUserId(user.getId(), pageable);
-
-                List<SessionResponse> sessions = sessionPage.getContent().stream()
-                        .map(s -> SessionResponse.builder()
-                                .id(s.getId())
-                                .title(s.getTitle())
-                                .createdAt(s.getCreatedAt())
-                                .lastMessage(s.getMessages().isEmpty() ? null :
-                                        s.getMessages().get(s.getMessages().size() - 1).getContent())
-                                .build())
-                        .toList();
-
-                PaginationResponse<SessionResponse> response = PaginationResponse.<SessionResponse>builder()
-                        .content(sessions)
-                        .page(sessionPage.getNumber())
-                        .size(sessionPage.getSize())
-                        .totalElements(sessionPage.getTotalElements())
-                        .totalPages(sessionPage.getTotalPages())
-                        .last(sessionPage.isLast())
-                        .build();
-
-                return ResponseEntity.status(HttpStatus.OK).body(createSuccessResponse(response,"Sessions fetched successfully"));
-
-
             }
+
+            // ======================================================
+            //      IF NO SESSION ID → FETCH SESSIONS
+            // ======================================================
+            Page<ChatSession> sessionPage;
+
+            if (isAdmin) {
+                // 🔥 ADMIN: fetch ALL sessions
+                sessionPage = chatSessionRepository.findAll(pageable);
+            } else {
+                // Normal User: fetch only their own
+                sessionPage = chatSessionRepository.findAllByUserId(user.getId(), pageable);
+            }
+
+            List<SessionResponse> sessions = sessionPage.getContent().stream()
+                    .map(s -> SessionResponse.builder()
+                            .id(s.getId())
+                            .title(s.getTitle())
+                            .createdAt(s.getCreatedAt())
+                            .lastMessage(s.getMessages().isEmpty() ? null :
+                                    s.getMessages().get(s.getMessages().size() - 1).getContent())
+                            .build())
+                    .toList();
+
+            PaginationResponse<SessionResponse> response = PaginationResponse.<SessionResponse>builder()
+                    .content(sessions)
+                    .page(sessionPage.getNumber())
+                    .size(sessionPage.getSize())
+                    .totalElements(sessionPage.getTotalElements())
+                    .totalPages(sessionPage.getTotalPages())
+                    .last(sessionPage.isLast())
+                    .build();
+
+            return ResponseEntity.ok(createSuccessResponse(response, "Sessions fetched successfully"));
 
         } catch (Exception ex) {
             log.error("Failed to fetch chats", ex);
@@ -224,6 +274,7 @@ public class ChatServiceImpl implements AIChatService {
                     .body(createFailureResponse(ex.getLocalizedMessage(), "Failed to fetch chats"));
         }
     }
+
 
     @Override
     public ResponseEntity<ApiResponse<?>> reviewAIResponse(Principal principal, Long messageId, EditAIResponseRequest request) {

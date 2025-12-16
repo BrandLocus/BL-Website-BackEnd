@@ -3,7 +3,9 @@ package com.hvc.brandlocus.services.impl;
 import com.hvc.brandlocus.dto.request.ChangePasswordRequest;
 import com.hvc.brandlocus.dto.request.CompletePasswordReset;
 import com.hvc.brandlocus.entities.BaseUser;
+import com.hvc.brandlocus.entities.Token;
 import com.hvc.brandlocus.repositories.BaseUserRepository;
+import com.hvc.brandlocus.repositories.TokenRepository;
 import com.hvc.brandlocus.services.PasswordService;
 import com.hvc.brandlocus.utils.ApiResponse;
 import lombok.RequiredArgsConstructor;
@@ -14,6 +16,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.security.Principal;
+import java.time.LocalDateTime;
 import java.util.Optional;
 
 import static com.hvc.brandlocus.utils.ResponseUtils.createFailureResponse;
@@ -25,6 +28,8 @@ import static com.hvc.brandlocus.utils.ResponseUtils.createSuccessResponse;
 public class PasswordServiceImpl implements PasswordService {
     private final BaseUserRepository baseUserRepository;
     private final PasswordEncoder passwordEncoder;
+    private final TokenRepository tokenRepository;
+
 
     @Override
     public ResponseEntity<ApiResponse<?>> changePassword(Principal principal, ChangePasswordRequest request) {
@@ -66,32 +71,59 @@ public class PasswordServiceImpl implements PasswordService {
     @Override
     public ResponseEntity<ApiResponse<?>> completePasswordReset(CompletePasswordReset request) {
         try {
+
+            log.info("password reset: {} {}", request.getPassword(),request.getConfirmPassword());
+
             if (!request.getPassword().equals(request.getConfirmPassword())) {
-
-                return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                        .body(createFailureResponse("Passwords do not match", "Passwords do not match"));
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        .body(createFailureResponse("", "Passwords do not match"));
             }
 
-            Optional<BaseUser> optionalUser = baseUserRepository.findByEmail(request.getEmail());
-            if (optionalUser.isEmpty()) {
-                return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                        .body(createFailureResponse("User not found", "User not found"));
+            Optional<Token> tokenOpt = tokenRepository.findByToken(request.getOtp());
+            if (tokenOpt.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        .body(createFailureResponse("", "Invalid OTP"));
             }
 
-            BaseUser user = optionalUser.get();
+            Token token = tokenOpt.get();
 
-            String encodedPassword = passwordEncoder.encode(request.getPassword());
-            user.setPassword(encodedPassword);
+            if (token.isUsed()) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        .body(createFailureResponse("", "OTP has already been used"));
+            }
+
+            if (!token.isValidated()) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        .body(createFailureResponse("", "OTP not validated"));
+            }
+
+            if (token.getExpiry().isBefore(LocalDateTime.now())) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        .body(createFailureResponse("", "OTP has expired"));
+            }
+
+            String email = token.getEmail();
+
+
+            BaseUser user = baseUserRepository.findByEmail(email)
+                    .orElseThrow(() -> new RuntimeException("User not found"));
+
+            user.setPassword(passwordEncoder.encode(request.getPassword()));
 
             baseUserRepository.save(user);
 
-            return ResponseEntity.status(HttpStatus.OK)
-                    .body(createSuccessResponse(null,"password reset successfully "));
-        }catch (Exception e) {
-            log.warn("error occurred while resetting password: {}", e.getMessage());
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(createFailureResponse("Invalid operation", "invalid operation"));
+            token.setUsed(true);
+            token.setExpired(true);
+            tokenRepository.save(token);
+
+            return ResponseEntity.ok(createSuccessResponse("", "Password reset successful"));
+
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(createFailureResponse(e.getMessage(), "An unexpected error occurred"));
         }
     }
+
 
 
 }

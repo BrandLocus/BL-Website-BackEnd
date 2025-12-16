@@ -50,10 +50,11 @@ public class ProfileServiceImpl implements ProfileService {
                     .firstName(profile.getFirstName())
                     .lastName(profile.getLastName())
                     .businessName(profile.getBusinessName())
-                    .industryName(profile.getLastName())
+                    .industryName(profile.getIndustryName())
                     .role(profile.getRole())
                     .state(profile.getState())
                     .country(profile.getCountry())
+                    .businessBrief(profile.getBusinessBrief())
                     .profileImageUrl(profile.getProfileImageUrl())
                     .email(profile.getEmail()).build();
 
@@ -69,14 +70,8 @@ public class ProfileServiceImpl implements ProfileService {
     public ResponseEntity<ApiResponse<?>> updateProfile(Principal principal, UpdateProfileRequest request) {
         try {
             String email = principal.getName();
-            Optional<BaseUser> optionalUser = baseUserRepository.findByEmail(email);
-            if (optionalUser.isEmpty()) {
-                return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                        .body(createFailureResponse("User not found", "No user found with email " + email));
-            }
-
-            BaseUser user = optionalUser.get();
-            log.info("first name: {}", user.getFirstName());
+            BaseUser user = baseUserRepository.findByEmail(email)
+                    .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
             if (request.getFirstName() != null && !request.getFirstName().isBlank()) {
                 user.setFirstName(request.getFirstName());
@@ -90,6 +85,10 @@ public class ProfileServiceImpl implements ProfileService {
             if (request.getBusinessName() != null && !request.getBusinessName().isBlank()) {
                 user.setBusinessName(request.getBusinessName());
             }
+            if (request.getBusinessBrief() != null && !request.getBusinessBrief().isBlank()) {
+                user.setBusinessBrief(request.getBusinessBrief());
+            }
+
             if (request.getProfileImageUrl() != null && !request.getProfileImageUrl().isBlank()) {
                 user.setProfileImageUrl(request.getProfileImageUrl());
             }
@@ -112,15 +111,25 @@ public class ProfileServiceImpl implements ProfileService {
                 if (request.getProfileImageUrl() != null && !request.getProfileImageUrl().isBlank()) {
                     profile.setProfileImageUrl(request.getProfileImageUrl());
                 }
+                if (request.getBusinessBrief() != null && !request.getBusinessBrief().isBlank()) {
+                    profile.setBusinessBrief(request.getBusinessBrief());
+                }
+                if (request.getCountry() != null && !request.getCountry().isBlank()) {
+                    profile.setCountry(request.getCountry());
+                }
+                if (request.getState() != null && !request.getState().isBlank()) {
+                    profile.setState(request.getState());
+                }
             }
 
             baseUserRepository.save(user);
 
-            return ResponseEntity.ok(createSuccessResponse(null,"Profile updated successfully"));
+            return ResponseEntity.ok(createSuccessResponse(null, "Profile updated successfully"));
 
-        }catch (Exception e) {
+        } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(createFailureResponse("Error updating profile", e.getMessage()));
         }
     }
+
 }

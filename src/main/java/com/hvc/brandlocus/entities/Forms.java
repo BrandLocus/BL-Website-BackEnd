@@ -21,9 +21,9 @@ import java.time.LocalDateTime;
 @Table(name = "forms")
 public class Forms extends BaseEntity{
 
-    @ManyToOne
-    @JoinColumn(name = "user_id", nullable = false)
-    private BaseUser user;
+//    @ManyToOne
+//    @JoinColumn(name = "user_id", nullable = false)
+//    private BaseUser user;
 
     private String firstName;
 

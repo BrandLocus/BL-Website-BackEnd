@@ -11,7 +11,7 @@ import java.util.List;
 public interface FormRepository extends JpaRepository<Forms, Long>,
         JpaSpecificationExecutor<Forms> {
 
-    List<Forms> findByUserAndIsActiveTrue(BaseUser user);
+//    List<Forms> findByUserAndIsActiveTrue(BaseUser user);
 
     List<Forms> findByIsActiveTrue();
 

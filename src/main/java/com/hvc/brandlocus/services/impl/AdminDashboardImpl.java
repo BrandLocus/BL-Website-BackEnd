@@ -4,6 +4,7 @@ import com.hvc.brandlocus.dto.response.ChartPoint;
 import com.hvc.brandlocus.dto.response.DashboardResponse;
 import com.hvc.brandlocus.entities.BaseUser;
 import com.hvc.brandlocus.entities.ChatMessage;
+import com.hvc.brandlocus.enums.SenderType;
 import com.hvc.brandlocus.enums.UserRoles;
 import com.hvc.brandlocus.repositories.BaseUserRepository;
 import com.hvc.brandlocus.repositories.ChatMessageRepository;
@@ -25,11 +26,9 @@ import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static com.hvc.brandlocus.utils.ResponseUtils.createFailureResponse;
 
@@ -172,41 +171,108 @@ public class AdminDashboardImpl implements AdminDashboardService {
 
 
 
+//    @Override
+//    public ResponseEntity<ApiResponse<?>> userGraph(Principal principal, LocalDate startDate, LocalDate endDate) {
+//        try {
+//            log.info("fetch user analytics");
+//            Optional<BaseUser> optionalUser = baseUserRepository.findByEmail(principal.getName().trim());
+//            if (optionalUser.isEmpty()) {
+//                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+//                        .body(createFailureResponse("User not found", "User with email " + principal.getName() + " does not exist"));
+//            }
+//            BaseUser admin = optionalUser.get();
+//
+//            if (!UserRoles.ADMIN.getValue().equalsIgnoreCase(admin.getRole().getName())) {
+//                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+//                        .body(ResponseUtils.createFailureResponse("access denied", "only admins can access this resource"));
+//            }
+//
+//            if (startDate == null || endDate == null) {
+//                YearMonth currentMonth = YearMonth.now();
+//                startDate = currentMonth.atDay(1);
+//                endDate = currentMonth.atEndOfMonth();
+//            }
+//
+//            log.info("this is the start date: {}",startDate);
+//            log.info("this is the end date: {}",endDate);
+//
+//            log.info("Date filter range: {} -> {}", startDate.atStartOfDay(), endDate.atTime(23,59,59));
+//
+//
+//            var dateSpec = BaseUserSpecification.createdBetween(startDate, endDate);
+//
+//            List<BaseUser> users = baseUserRepository.findAll(dateSpec);
+//
+//            log.info("Fetched {} users from DB for that range", users.size());
+//            users.forEach(u -> log.info("User: {}, createdAt: {}, state: {}", u.getEmail(), u.getCreatedAt(), u.getState()));
+//
+//
+//            Map<String, Long> stateUserCount = users.stream()
+//                    .filter(u -> u.getState() != null && !u.getState().isBlank())
+//                    .collect(Collectors.groupingBy(BaseUser::getState, Collectors.counting()));
+//
+//            long totalUsers = stateUserCount.values().stream().mapToLong(Long::longValue).sum();
+//
+//            List<Map<String, Object>> stateStats = stateUserCount.entrySet().stream()
+//                    .map(entry -> {
+//                        String state = entry.getKey();
+//                        long count = entry.getValue();
+//                        double percentage = totalUsers > 0 ? (count * 100.0 / totalUsers) : 0.0;
+//                        Map<String, Object> map = new HashMap<>();
+//                        map.put("state", state);
+//                        map.put("users", count);
+//                        map.put("percentage", String.format("%.2f%%", percentage));
+//                        return map;
+//                    })
+//                    .sorted((a, b) -> Long.compare((Long) b.get("users"), (Long) a.get("users")))
+//                    .collect(Collectors.toList());
+//
+//
+//
+//            return ResponseEntity.ok(ResponseUtils.createSuccessResponse(stateStats,"User distribution fetched successfully"));
+//
+//        }catch (Exception ex) {
+//            return ResponseEntity.internalServerError()
+//                    .body(ResponseUtils.createFailureResponse("Server error", ex.getMessage()));
+//        }
+//
+//
+//    }
+
     @Override
     public ResponseEntity<ApiResponse<?>> userGraph(Principal principal, LocalDate startDate, LocalDate endDate) {
         try {
-            log.info("fetch user analytics");
-            Optional<BaseUser> optionalUser = baseUserRepository.findByEmail(principal.getName().trim());
-            if (optionalUser.isEmpty()) {
-                return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                        .body(createFailureResponse("User not found", "User with email " + principal.getName() + " does not exist"));
-            }
-            BaseUser admin = optionalUser.get();
+            log.info("Fetching user analytics");
+
+            // ---------------------------
+            // 1️⃣ Validate admin user
+            // ---------------------------
+            BaseUser admin = baseUserRepository.findByEmail(principal.getName().trim())
+                    .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
             if (!UserRoles.ADMIN.getValue().equalsIgnoreCase(admin.getRole().getName())) {
                 return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                        .body(ResponseUtils.createFailureResponse("access denied", "only admins can access this resource"));
+                        .body(ResponseUtils.createFailureResponse("Access denied", "Only admins can access this resource"));
             }
 
+            // ---------------------------
+            // 2️⃣ Default date range = current month
+            // ---------------------------
             if (startDate == null || endDate == null) {
                 YearMonth currentMonth = YearMonth.now();
                 startDate = currentMonth.atDay(1);
                 endDate = currentMonth.atEndOfMonth();
             }
 
-            log.info("this is the start date: {}",startDate);
-            log.info("this is the end date: {}",endDate);
+            LocalDateTime start = startDate.atStartOfDay();
+            LocalDateTime end = endDate.atTime(23, 59, 59);
+            log.info("Date range: {} -> {}", start, end);
 
-            log.info("Date filter range: {} -> {}", startDate.atStartOfDay(), endDate.atTime(23,59,59));
-
-
+            // ---------------------------
+            // 3️⃣ State distribution
+            // ---------------------------
             var dateSpec = BaseUserSpecification.createdBetween(startDate, endDate);
-
             List<BaseUser> users = baseUserRepository.findAll(dateSpec);
-
-            log.info("Fetched {} users from DB for that range", users.size());
-            users.forEach(u -> log.info("User: {}, createdAt: {}, state: {}", u.getEmail(), u.getCreatedAt(), u.getState()));
-
 
             Map<String, Long> stateUserCount = users.stream()
                     .filter(u -> u.getState() != null && !u.getState().isBlank())
@@ -228,15 +294,85 @@ public class AdminDashboardImpl implements AdminDashboardService {
                     .sorted((a, b) -> Long.compare((Long) b.get("users"), (Long) a.get("users")))
                     .collect(Collectors.toList());
 
-            return ResponseEntity.ok(ResponseUtils.createSuccessResponse(stateStats,"User distribution fetched successfully"));
+            // ---------------------------
+            // 4️⃣ Fetch AI messages in date range
+            // ---------------------------
+            List<ChatMessage> aiMessages = chatMessageRepository.findMessagesWithinRange(start, end).stream()
+                    .filter(m -> m.getSender() == SenderType.AI)
+                    .collect(Collectors.toList());
 
-        }catch (Exception ex) {
+            // ---------------------------
+            // 5️⃣ Top 5 sectors
+            // ---------------------------
+            Map<String, Long> topSectors = aiMessages.stream()
+                    .filter(m -> m.getSector() != null && !m.getSector().isBlank())
+                    .collect(Collectors.groupingBy(ChatMessage::getSector, Collectors.counting()))
+                    .entrySet().stream()
+                    .sorted(Map.Entry.<String, Long>comparingByValue().reversed())
+                    .limit(5)
+                    .collect(Collectors.toMap(
+                            Map.Entry::getKey, Map.Entry::getValue, (a,b)->a, LinkedHashMap::new
+                    ));
+
+            // ---------------------------
+            // 6️⃣ Top 15 keywords
+            // ---------------------------
+            Map<String, Long> topKeywords = aiMessages.stream()
+                    .flatMap(m -> Arrays.stream(Optional.ofNullable(m.getKeywords()).orElse("").split(","))
+                            .map(String::trim)
+                            .filter(k -> !k.isBlank()))
+                    .collect(Collectors.groupingBy(k -> k, Collectors.counting()))
+                    .entrySet().stream()
+                    .sorted(Map.Entry.<String, Long>comparingByValue().reversed())
+                    .limit(15)
+                    .collect(Collectors.toMap(
+                            Map.Entry::getKey, Map.Entry::getValue, (a,b)->a, LinkedHashMap::new
+                    ));
+
+            // ---------------------------
+            // 7️⃣ Top 5 topics with number of users
+            // ---------------------------
+            Map<String, Long> topTopics = aiMessages.stream()
+                    .filter(m -> m.getTopic() != null && !m.getTopic().isBlank())
+                    .collect(Collectors.groupingBy(
+                            ChatMessage::getTopic,
+                            Collectors.mapping(m -> m.getChatSession().getUser().getId(), Collectors.toSet())
+                    )) // set ensures unique users
+                    .entrySet().stream()
+                    .collect(Collectors.toMap(
+                            Map.Entry::getKey,
+                            e -> (long) e.getValue().size()
+                    ))
+                    .entrySet().stream()
+                    .sorted(Map.Entry.<String, Long>comparingByValue().reversed())
+                    .limit(5)
+                    .collect(Collectors.toMap(
+                            Map.Entry::getKey, Map.Entry::getValue, (a,b)->a, LinkedHashMap::new
+                    ));
+
+            // ---------------------------
+            // 8️⃣ Build final response
+            // ---------------------------
+            Map<String, Object> finalResponse = new HashMap<>();
+            finalResponse.put("stateDistribution", stateStats);
+            finalResponse.put("topSectors", topSectors);
+            finalResponse.put("topKeywords", topKeywords);
+            finalResponse.put("topTopics", topTopics);
+
+            return ResponseEntity.ok(ResponseUtils.createSuccessResponse(finalResponse, "User analytics fetched successfully"));
+
+        } catch (Exception ex) {
+            log.error("Error fetching user analytics", ex);
             return ResponseEntity.internalServerError()
                     .body(ResponseUtils.createFailureResponse("Server error", ex.getMessage()));
         }
-
-
     }
+
+
+
+
+
+
 
     private ResponseEntity<ApiResponse<?>> validateDateRangeWithTimeFilter(
             String timeFilter,

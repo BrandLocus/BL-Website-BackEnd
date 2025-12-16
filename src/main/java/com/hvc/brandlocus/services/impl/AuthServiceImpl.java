@@ -2,15 +2,18 @@ package com.hvc.brandlocus.services.impl;
 
 import com.hvc.brandlocus.dto.request.LoginRequest;
 import com.hvc.brandlocus.dto.request.RegisterUserRequest;
+import com.hvc.brandlocus.dto.response.AuthTokenResponse;
 import com.hvc.brandlocus.dto.response.LoginResponse;
 import com.hvc.brandlocus.entities.BaseUser;
 import com.hvc.brandlocus.entities.Profile;
+import com.hvc.brandlocus.entities.RefreshToken;
 import com.hvc.brandlocus.entities.Roles;
 import com.hvc.brandlocus.enums.UserRoles;
 import com.hvc.brandlocus.enums.UserStatus;
 import com.hvc.brandlocus.repositories.BaseUserRepository;
 import com.hvc.brandlocus.repositories.RolesRepository;
 import com.hvc.brandlocus.security.filter.filterservice.JwtService;
+import com.hvc.brandlocus.security.filter.filterservice.RefreshTokenServiceInterface;
 import com.hvc.brandlocus.services.AuthService;
 import com.hvc.brandlocus.utils.ApiResponse;
 import lombok.RequiredArgsConstructor;
@@ -38,6 +41,7 @@ public class AuthServiceImpl implements AuthService {
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationManager authenticationManager;
     private final JwtService jwtService;
+    private final RefreshTokenServiceInterface refreshTokenServiceInterface;
 
     @Override
     public ResponseEntity<ApiResponse<?>> registerUser(RegisterUserRequest request) {
@@ -65,6 +69,7 @@ public class AuthServiceImpl implements AuthService {
                     .lastName(request.getLastName())
                     .industryName(request.getIndustryName())
                     .businessName(request.getBusinessName())
+                    .businessBrief(request.getBusinessBrief())
                     .email(request.getEmail().trim())
                     .password(passwordEncoder.encode(request.getPassword()))
                     .role(role)
@@ -83,6 +88,7 @@ public class AuthServiceImpl implements AuthService {
                     .email(newUser.getEmail())
                     .industryName(newUser.getIndustryName())
                     .businessName(newUser.getBusinessName())
+                    .businessBrief(newUser.getBusinessBrief())
                     .state(request.getState())
                     .country(request.getCountry())
                     .role(role.getName())
@@ -93,7 +99,30 @@ public class AuthServiceImpl implements AuthService {
             baseUserRepository.save(newUser);
 
 
-            return ResponseEntity.status(HttpStatus.CREATED).body(createSuccessResponse(null,"User registered successfully"));
+            String token = jwtService.generateToken(newUser);
+            RefreshToken refreshToken = refreshTokenServiceInterface.createRefreshToken(newUser);
+
+
+//            LoginResponse response = LoginResponse.builder()
+//                    .userId(newUser.getId())
+//                    .role(role.getName())
+//                    .isActive(true)
+//                    .jwtToken(token)
+//                    .email(newUser.getEmail())
+//                    .build();
+
+
+            AuthTokenResponse response = AuthTokenResponse.builder()
+                    .userId(newUser.getId())
+                    .role(role.getName())
+                    .isActive(true)
+                    .email(newUser.getEmail())
+                    .jwtToken(token)
+                    .refreshToken(refreshToken.getToken())
+                    .build();
+
+            return ResponseEntity.status(HttpStatus.CREATED)
+                    .body(createSuccessResponse(response, "User registered successfully"));
 
 
 
@@ -114,12 +143,18 @@ public class AuthServiceImpl implements AuthService {
             authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(request.getEmail().trim(),request.getPassword()));
             log.info("authenticated user : {}",baseUser.getEmail());
             var jwtToken = jwtService.generateToken(baseUser);
+            RefreshToken refreshToken = refreshTokenServiceInterface.createRefreshToken(baseUser);
 
-            LoginResponse response = LoginResponse.builder().userId(baseUser.getId())
+            AuthTokenResponse response = AuthTokenResponse.builder()
+                    .userId(baseUser.getId())
                     .role(baseUser.getRole().getName())
-                    .isActive(baseUser.getIsActive())
+                    .isActive(true)
+                    .email(baseUser.getEmail())
                     .jwtToken(jwtToken)
-                    .email(baseUser.getEmail()).build();
+                    .refreshToken(refreshToken.getToken())
+                    .build();
+
+
 
             return ResponseEntity.status(HttpStatus.CREATED).body(createSuccessResponse(response,"login successful"));
         }catch (AuthenticationException e) {

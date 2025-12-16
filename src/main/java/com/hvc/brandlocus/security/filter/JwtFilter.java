@@ -95,6 +95,7 @@ public class JwtFilter extends OncePerRequestFilter {
         boolean isExempted = requestURI != null && (
                 requestURI.startsWith("/api/v1/auth/") ||
                         requestURI.startsWith("/token/") ||
+                        requestURI.startsWith("/forms/submit/") ||
                         requestURI.startsWith("/actuator/") ||
                         requestURI.equals("/swagger-ui.html") ||
                         requestURI.equals("/swagger-ui/index.html") ||

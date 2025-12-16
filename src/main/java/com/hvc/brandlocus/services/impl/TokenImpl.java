@@ -94,7 +94,7 @@ public class TokenImpl implements TokenService {
 
            log.info("This is the token: {}", token.getToken());
 
-           return ResponseEntity.ok(createSuccessResponse("", "OTP sent successfully"));
+           return ResponseEntity.ok(createSuccessResponse(token.getToken(), "OTP sent successfully"));
 
        }catch (Exception e) {
            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
@@ -107,15 +107,19 @@ public class TokenImpl implements TokenService {
         try {
             String otp = request.getToken();
             String email = request.getEmail();
+            String purpose = request.getPurpose(); // NEW FIELD
 
-            if ((email == null || email.isEmpty())) {
+            if (email == null || email.isEmpty()) {
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                         .body(createFailureResponse("", "Email is required"));
             }
 
-            Optional<Token> existingToken;
+            if (purpose == null || purpose.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        .body(createFailureResponse("", "Purpose is required"));
+            }
 
-                existingToken = tokenRepository.findByEmail(email);
+            Optional<Token> existingToken = tokenRepository.findByEmail(email);
 
             if (existingToken.isEmpty()) {
                 return ResponseEntity.status(HttpStatus.NOT_FOUND)
@@ -136,20 +140,42 @@ public class TokenImpl implements TokenService {
                         .body(createFailureResponse("", "OTP has expired"));
             }
 
-            if (token.isUsed()) {
+            if (token.isValidated()) {
+                // Prevent re-validation for both purposes
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        .body(createFailureResponse("", "OTP has already been verified"));
+            }
+
+
+            token.setValidated(true);
+
+
+
+            if (token.isUsed() && purpose.equalsIgnoreCase("EMAIL_VERIFICATION")) {
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                         .body(createFailureResponse("", "OTP has already been used"));
             }
 
-            token.setValidated(true);
-            token.setUsed(true);
+
+            if (purpose.equalsIgnoreCase("EMAIL_VERIFICATION")) {
+                token.setUsed(true);
+            }
+            else if (purpose.equalsIgnoreCase("PASSWORD_RESET")) {
+                token.setUsed(false);
+            }
+            else {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        .body(createFailureResponse("", "Invalid token purpose"));
+            }
+
             tokenRepository.save(token);
 
             return ResponseEntity.ok(createSuccessResponse("", "OTP verified successfully"));
 
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(createFailureResponse(e.getLocalizedMessage(), "An unexpected error occurred while verifying token"));
+                    .body(createFailureResponse(e.getLocalizedMessage(),
+                            "An unexpected error occurred while verifying token"));
         }
     }
 

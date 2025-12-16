@@ -45,6 +45,9 @@ public class BaseUser extends BaseEntity implements UserDetails {
     @Column(nullable = false)
     private String businessName;
 
+    @Column(columnDefinition = "TEXT", nullable = true)
+    private String businessBrief;
+
 
     private String profileImageUrl;
 
@@ -66,6 +69,13 @@ public class BaseUser extends BaseEntity implements UserDetails {
 
     @Column(nullable = false)
     private String userStatus;
+
+    @Column(nullable = false)
+    private int chatRequestCount = 0;
+
+    @Version
+    private Long version;
+
 
     private Boolean agreementToReceiveAIGeneratedResponse = false;
 

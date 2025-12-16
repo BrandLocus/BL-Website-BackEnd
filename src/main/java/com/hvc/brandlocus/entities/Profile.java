@@ -34,6 +34,9 @@ public class Profile extends BaseEntity{
     @Column(nullable = false)
     private String businessName;
 
+    @Column(columnDefinition = "TEXT", nullable = true)
+    private String businessBrief;
+
     private String role;
 
     private String country;

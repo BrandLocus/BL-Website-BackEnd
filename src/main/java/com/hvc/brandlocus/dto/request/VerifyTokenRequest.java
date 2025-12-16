@@ -10,4 +10,5 @@ import lombok.*;
 public class VerifyTokenRequest {
     private String email;
     private String token;
+    private String purpose;
 }

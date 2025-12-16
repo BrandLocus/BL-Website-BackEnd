@@ -22,10 +22,9 @@ public class FormController {
 
     @PostMapping("/submit")
     public ResponseEntity<ApiResponse<?>> submitForm(
-            Principal principal,
             @RequestBody CreateFormRequest createFormRequest
     ) {
-        return formService.submitForm(principal, createFormRequest);
+        return formService.submitForm(createFormRequest);
     }
 
     /**
