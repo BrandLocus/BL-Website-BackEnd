@@ -102,25 +102,25 @@ public class AdminDashboardImpl implements AdminDashboardService {
                 compareFrom = from.minus(duration);
             }
 
-            // SPECIFICATIONS
+
             Specification<BaseUser> userSpec;
             Specification<ChatMessage> chatSpec;
 
             if (startDate != null && endDate != null) {
-                // DATE RANGE MODE
+
                 userSpec = BaseUserSpecification.createdBetween(startDate, endDate)
                         .and(BaseUserSpecification.excludeAdmin());
 
                 chatSpec = ChatMessageSpecification.createdBetween(startDate, endDate);
             } else {
-                // FILTER MODE
+
                 userSpec = BaseUserSpecification.byTimeFilter(safeFilter)
                         .and(BaseUserSpecification.excludeAdmin());
 
                 chatSpec = ChatMessageSpecification.byTimeFilter(safeFilter);
             }
 
-            // TOTAL COUNTS
+
             long totalUsers = baseUserRepository.count(userSpec);
             long totalConversations = chatMessageRepository.count(chatSpec);
 

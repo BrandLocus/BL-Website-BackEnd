@@ -19,4 +19,6 @@ public interface UserService {
             String endDate,
             PaginationRequest paginationRequest
     );
+
+    ResponseEntity<ApiResponse<?>> getAllUsers(Principal principal);
 }

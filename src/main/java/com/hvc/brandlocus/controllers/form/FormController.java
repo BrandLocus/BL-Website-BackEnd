@@ -55,6 +55,12 @@ public class FormController {
     }
 
 
+    @GetMapping("/export")
+    public ResponseEntity<ApiResponse<?>> exportAllForms(Principal principal) {
+        return formService.getAllForms(principal);
+    }
+
+
     @GetMapping("/service-needed")
     public ResponseEntity<List<String>> getAllServicesNeeded() {
         List<String> services = Arrays.stream(ServiceNeeded.values())

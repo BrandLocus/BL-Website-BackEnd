@@ -62,4 +62,13 @@ public class ChatController {
         return chatService.reviewAIResponse(principal,messageId,request);
     }
 
+    @GetMapping("/export")
+    public ResponseEntity<ApiResponse<?>> exportChatCSV(
+            Principal principal,
+            @RequestParam(required = false) Long sessionId
+    ) {
+        return chatService.getAllChats(principal, sessionId);
+    }
+
+
 }

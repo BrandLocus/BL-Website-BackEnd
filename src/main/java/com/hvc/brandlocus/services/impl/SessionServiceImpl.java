@@ -80,7 +80,7 @@ public class SessionServiceImpl implements SessionService {
                                 .chatType(msg.getChatType().toString())
                                 .content(msg.getContent())
                                 .name(msg.getChatSession().getUser().getFirstName() + "" + msg.getChatSession().getUser().getLastName())
-                                .industryName(msg.getChatSession().getUser().getIndustryName())
+//                                .industryName(msg.getChatSession().getUser().getIndustryName())
                                 .businessName(msg.getChatSession().getUser().getBusinessName())
                                 .createdAt(msg.getCreatedAt().toString())
                                 .build())

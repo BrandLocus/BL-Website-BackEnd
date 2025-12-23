@@ -16,7 +16,7 @@ public class CreateFormRequest {
 
     private String serviceNeeded;
 
-//    private String industryName;
+    private String industryName;
 
     private String companyName;
 

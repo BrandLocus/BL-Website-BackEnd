@@ -10,7 +10,11 @@ public enum ServiceNeeded {
     BRAND_DEVELOPMENT("Brand Development"),
     CAPACITY_BUILDING("Capacity Building"),
     TRADE_AND_INVESTMENT_FACILITATION("Trade & Investment Facilitation"),
-    BUSINESS_QUEST("Business Quest");
+    BUSINESS_QUEST("Business Quest"),
+    MARKETING_CONSULTING("Marketing Consulting"),
+    CONTACT("Contact"),
+    PLAY_TEST("PlayTest"),
+    OTHERS("OTHERS");
 
     private final String value;
 

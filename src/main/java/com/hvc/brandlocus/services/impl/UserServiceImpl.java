@@ -4,11 +4,13 @@ import com.hvc.brandlocus.dto.request.PaginationRequest;
 import com.hvc.brandlocus.dto.response.PaginationResponse;
 import com.hvc.brandlocus.dto.response.UserResponse;
 import com.hvc.brandlocus.entities.BaseUser;
+import com.hvc.brandlocus.enums.UserRoles;
 import com.hvc.brandlocus.repositories.BaseUserRepository;
 import com.hvc.brandlocus.repositories.specification.BaseUserSpecification;
 import com.hvc.brandlocus.services.UserService;
 import com.hvc.brandlocus.utils.ApiResponse;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -29,6 +31,7 @@ import static com.hvc.brandlocus.utils.ResponseUtils.createSuccessResponse;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class UserServiceImpl implements UserService {
 
     private final BaseUserRepository userRepository;
@@ -46,6 +49,27 @@ public class UserServiceImpl implements UserService {
             PaginationRequest paginationRequest
     ) {
         try {
+            if (principal == null) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(createFailureResponse("Unauthorized", "User is not authenticated"));
+            }
+
+            BaseUser loggedInUser = userRepository.findByEmail(principal.getName())
+                    .orElseThrow(() -> new RuntimeException("Authenticated user not found"));
+
+            // 🔐 3. Check ADMIN role
+            if (loggedInUser.getRole() == null ||
+                    !UserRoles.ADMIN.getValue().equalsIgnoreCase(loggedInUser.getRole().getName())) {
+
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body(createFailureResponse(
+                                "Access denied",
+                                "Only administrators are allowed to access this resource"
+                        ));
+            }
+
+
+
             if (userId != null) {
                 Optional<BaseUser> userOpt = userRepository.findById(userId);
                 if (userOpt.isEmpty()) {
@@ -62,6 +86,7 @@ public class UserServiceImpl implements UserService {
                         .email(user.getEmail())
                         .industryName(user.getIndustryName())
                         .businessName(user.getBusinessName())
+                        .businessBrief(user.getBusinessBrief())
                         .profileImageUrl(user.getProfileImageUrl())
                         .role(user.getRole() != null ? user.getRole().getName() : null)
                         .state(user.getState())
@@ -103,11 +128,13 @@ public class UserServiceImpl implements UserService {
 
             List<UserResponse> users = userPage.getContent().stream()
                     .map(user -> UserResponse.builder()
+                            .userId(user.getId())
                             .firstName(user.getFirstName())
                             .lastName(user.getLastName())
                             .email(user.getEmail())
                             .industryName(user.getIndustryName())
                             .businessName(user.getBusinessName())
+                            .businessBrief(user.getBusinessBrief())
                             .profileImageUrl(user.getProfileImageUrl())
                             .role(user.getRole() != null ? user.getRole().getName() : null)
                             .state(user.getState())
@@ -132,4 +159,56 @@ public class UserServiceImpl implements UserService {
                     .body(createFailureResponse(e.getLocalizedMessage(), "Failed to fetch users: " + e.getMessage()));
         }
     }
+
+    @Override
+    public ResponseEntity<ApiResponse<?>> getAllUsers(Principal principal) {
+        try {
+            // Fetch the requesting user
+            Optional<BaseUser> optionalUser = userRepository.findByEmail(principal.getName().trim());
+
+            if (optionalUser.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body(createFailureResponse("User not found", "User does not exist"));
+            }
+
+            BaseUser admin = optionalUser.get();
+
+            if (admin.getRole() == null || !"ADMIN".equalsIgnoreCase(admin.getRole().getName())) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body(createFailureResponse("Access denied", "Admin access required"));
+            }
+
+            // Fetch all users except those with ADMIN role
+            List<BaseUser> users = userRepository.findAll().stream()
+                    .filter(user -> user.getRole() == null || !"ADMIN".equalsIgnoreCase(user.getRole().getName()))
+                    .toList();
+
+            List<UserResponse> userResponses = users.stream()
+                    .map(user -> UserResponse.builder()
+                            .firstName(user.getFirstName())
+                            .lastName(user.getLastName())
+                            .email(user.getEmail())
+                            .industryName(user.getIndustryName())
+                            .businessName(user.getBusinessName())
+                            .businessBrief(user.getBusinessBrief())
+                            .profileImageUrl(user.getProfileImageUrl())
+                            .role(user.getRole() != null ? user.getRole().getName() : null)
+                            .state(user.getState())
+                            .country(user.getCountry())
+                            .build()
+                    )
+                    .toList();
+
+            return ResponseEntity.ok(
+                    createSuccessResponse(userResponses, "Users fetched successfully")
+            );
+
+        } catch (Exception e) {
+            log.error("Error fetching users", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(createFailureResponse(e.getLocalizedMessage(), "Failed to fetch users"));
+        }
+    }
+
+
 }

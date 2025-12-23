@@ -40,33 +40,45 @@ public class OpenAIService {
             String businessBrief,
             String businessName,
             String industryName,
-            String userName
+            String userName,
+            String state,
+            String country
     ) {
+
         try {
             log.info("Calling OpenAI with {} history messages", chatHistory.size());
 
             // Build the personalization context
             String personalizationContext = """
-            You are a helpful assistant for BrandLocus, a business/marketing platform.
+You are a helpful assistant for BrandLocus, a business/marketing platform.
 
-            PERSONALIZATION CONTEXT:
-            - User Name: %s
-            - Business Name: %s
-            - Industry: %s
-            - Business Brief: %s
+PERSONALIZATION CONTEXT:
+- User Name: %s
+- Business Name: %s
+- Industry: %s
+- Business Brief: %s
+- State/Region: %s
+- Country: %s
 
-            IMPORTANT: Use the above information to personalize all responses. 
-            Do NOT give generic answers. Tailor insights, suggestions, and recommendations to this user and their business.
-            
-            Only answer questions related to business, marketing, branding, and product management.
-            If a user asks about unrelated topics (politics, sports, cooking, etc.), politely decline and redirect them to business-related topics.
-            Always be professional and helpful.
-        """.formatted(
-                    userName != null ? userName : "N/A",
-                    businessName != null ? businessName : "N/A",
-                    industryName != null ? industryName : "N/A",
-                    businessBrief != null ? businessBrief : "N/A"
+IMPORTANT:
+- Use the location (state and country) to tailor marketing strategies, 
+  customer behavior insights, pricing, channels, and regulations.
+- Avoid generic advice. Always localize recommendations.
+- Reference local trends, consumer behavior, and market realities when relevant.
+
+SCOPE RULES:
+- Only answer questions related to business, marketing, branding, product management, and growth.
+- If the user asks about unrelated topics (politics, sports, cooking, etc.), politely decline and redirect to business-related topics.
+- Always be professional, concise, and actionable.
+""".formatted(
+                    userName != null && !userName.isBlank() ? userName : "N/A",
+                    businessName != null && !businessName.isBlank() ? businessName : "N/A",
+                    industryName != null && !industryName.isBlank() ? industryName : "N/A",
+                    businessBrief != null && !businessBrief.isBlank() ? businessBrief : "N/A",
+                    state != null && !state.isBlank() ? state : "N/A",
+                    country != null && !country.isBlank() ? country : "N/A"
             );
+
 
             ChatCompletionCreateParams.Builder paramsBuilder = ChatCompletionCreateParams.builder()
                     .addDeveloperMessage(personalizationContext)
@@ -96,9 +108,77 @@ public class OpenAIService {
 
 
 
-
-
     public MessageClassification classifyMessage(String text) {
+        try {
+            ChatCompletionCreateParams params = ChatCompletionCreateParams.builder()
+                    .model(ChatModel.GPT_4O_MINI)
+                    .addSystemMessage("""
+                You are a strict classifier.
+
+                Return ONLY a valid JSON object in this exact format:
+                {
+                  "sector": "<ONE_SECTOR_FROM_LIST>",
+                  "keywords": ["kw1", "kw2", "kw3"],
+                  "topic": "<one-word topic>"
+                }
+
+                VALID SECTORS (use ONLY one of these):
+                - Agriculture
+                - Manufacturing
+                - Trade
+                - Energy & Climate
+                - Technology
+                - Healthcare
+                - Real Estate
+                - Transport & Logistics
+                - Education
+                - Creative Media & Culture
+                - Finance
+                - Public Policy
+                - Others
+
+                CLASSIFICATION RULES:
+                - Pick ONE dominant sector only.
+                - If the message touches multiple sectors, choose the most relevant.
+                - If it is business-related but unclear, use "Others".
+                - If it is NOT business-related, use "Others".
+                - Do NOT invent new sectors.
+                - Do NOT return explanations, markdown, or extra text.
+                """)
+                    .addUserMessage(text)
+                    .build();
+
+            ChatCompletion completion =
+                    openAIClient.chat().completions().create(params);
+
+            String json = completion.choices()
+                    .getFirst()
+                    .message()
+                    .content()
+                    .orElse("{}")
+                    .trim();
+
+            ObjectMapper mapper = new ObjectMapper();
+            return mapper.readValue(json, MessageClassification.class);
+
+        } catch (Exception e) {
+            log.error("Failed to classify message: {}", e.getMessage(), e);
+
+            // HARD fallback – never break your pipeline
+            MessageClassification fallback = new MessageClassification();
+            fallback.setSector("Others");
+            fallback.setKeywords(List.of());
+            fallback.setTopic("general");
+            return fallback;
+        }
+    }
+
+
+
+
+
+
+    /*public MessageClassification classifyMessage(String text) {
         try {
             ChatCompletionCreateParams params = ChatCompletionCreateParams.builder()
                     .model(ChatModel.GPT_4O_MINI)
@@ -192,7 +272,7 @@ public class OpenAIService {
             fallback.setTopic("Unknown");
             return fallback;
         }
-    }
+    }*/
     }
 
 

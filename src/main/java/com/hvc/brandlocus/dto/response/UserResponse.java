@@ -23,8 +23,9 @@ public class UserResponse {
 
     private String industryName;
 
-
     private String businessName;
+
+    private String businessBrief;
 
 
     private String profileImageUrl;

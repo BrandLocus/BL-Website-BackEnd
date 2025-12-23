@@ -19,17 +19,22 @@ public class UserController {
 
     private final UserService userService;
 
+    @GetMapping("/export")
+    public ResponseEntity<ApiResponse<?>> exportAllUsers(Principal principal) {
+        return userService.getAllUsers(principal);
+    }
+
 
     @GetMapping("/")
     public ResponseEntity<ApiResponse<?>> getAllUsers(
             Principal principal,
             @RequestParam(required = false) Long userId,
             @RequestParam(required = false) String searchTerm,
-            @RequestParam(required = false, defaultValue = "alltime") String timeFilter, // alltime, 12months, 30days, 7days, 24hrs
-            @RequestParam(required = false) String state, // yyyy-MM-dd
+            @RequestParam(required = false, defaultValue = "alltime") String timeFilter,
+            @RequestParam(required = false) String state,
             @RequestParam(required = false) String country,
-            @RequestParam(required = false) String startDate, // yyyy-MM-dd
-            @RequestParam(required = false) String endDate,   // yyyy-MM-dd
+            @RequestParam(required = false) String startDate,
+            @RequestParam(required = false) String endDate,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int limit,
             @RequestParam(defaultValue = "createdAt") String sortBy,
@@ -54,6 +59,9 @@ public class UserController {
                 endDate,
                 paginationRequest
         );
+
+
+
 
 }}
 

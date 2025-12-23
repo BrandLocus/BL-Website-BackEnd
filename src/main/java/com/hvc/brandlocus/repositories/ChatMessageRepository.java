@@ -17,6 +17,7 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long>,
         JpaSpecificationExecutor<ChatMessage> {
     Page<ChatMessage> findAllByChatSessionId(Long sessionId, Pageable pageable);
     List<ChatMessage> findByChatSessionOrderByCreatedAtAsc(ChatSession chatSession);
+    List<ChatMessage> findByChatSessionId(Long sessionId);
 
     @Query("""
         SELECT m FROM ChatMessage m

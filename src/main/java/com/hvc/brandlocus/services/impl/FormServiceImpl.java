@@ -51,42 +51,244 @@ public class FormServiceImpl implements FormService {
     public ResponseEntity<ApiResponse<?>> submitForm(CreateFormRequest createFormRequest) {
         try {
 
+            ServiceNeeded serviceNeeded = null;
 
-//            String email = principal.getName();
-//            log.info("submit form for email: {}", email);
-//
-//            Optional<BaseUser> optionalUser = baseUserRepository.findByEmail(email);
-//
-//            if (optionalUser.isEmpty()) {
-//                return ResponseEntity.status(HttpStatus.NOT_FOUND)
-//                        .body(createFailureResponse("User not found", "User does not exist"));
-//            }
-//
-//            BaseUser user = optionalUser.get();
+            if (createFormRequest.getServiceNeeded() != null &&
+                    !createFormRequest.getServiceNeeded().isBlank()) {
+                serviceNeeded = ServiceNeeded.fromString(
+                        createFormRequest.getServiceNeeded()
+                );
+            }
 
             Forms form = Forms.builder()
                     .firstName(createFormRequest.getFirstName())
                     .lastName(createFormRequest.getLastName())
                     .email(createFormRequest.getEmail())
-                    .serviceNeeded(ServiceNeeded.valueOf(createFormRequest.getServiceNeeded()))
+                    .serviceNeeded(serviceNeeded) // ✅ can be null
+                    .industryName(createFormRequest.getIndustryName())
                     .companyName(createFormRequest.getCompanyName())
                     .message(createFormRequest.getMessage())
-//                    .user(user)
                     .isActive(true)
                     .status(FormStatus.ACTIVE)
                     .build();
 
             formRepository.save(form);
 
-            return ResponseEntity.status(HttpStatus.CREATED).body(createSuccessResponse(null, "Form submitted successfully"));
+            return ResponseEntity.status(HttpStatus.CREATED)
+                    .body(createSuccessResponse(null, "Form submitted successfully"));
 
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(createFailureResponse("error", e.getMessage()));
-
         }
-
     }
+
+
+//    @Override
+//    public ResponseEntity<ApiResponse<?>> getForm(
+//            Principal principal,
+//            String searchTerm,
+//            String timeFilter,
+//            String filterTerm,
+//            String startDate,
+//            String endDate,
+//            PaginationRequest paginationRequest) {
+//
+//        try {
+//            Optional<BaseUser> optionalUser = baseUserRepository.findByEmail(principal.getName().trim());
+//            if (optionalUser.isEmpty()) {
+//                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+//                        .body(createFailureResponse("User not found", "User does not exist"));
+//            }
+//
+//            BaseUser user = optionalUser.get();
+//            boolean isAdmin = user.getRole() != null && "ADMIN".equalsIgnoreCase(user.getRole().getName());
+//
+//            Sort.Direction direction = "asc".equalsIgnoreCase(paginationRequest.getOrder()) ?
+//                    Sort.Direction.ASC : Sort.Direction.DESC;
+//
+//            Pageable pageable = PageRequest.of(
+//                    paginationRequest.getPage(),
+//                    paginationRequest.getLimit(),
+//                    Sort.by(direction, paginationRequest.getSortBy())
+//            );
+//
+//            LocalDate start = startDate != null ? LocalDate.parse(startDate, DateTimeFormatter.ofPattern("yyyy-MM-dd")) : null;
+//            LocalDate end = endDate != null ? LocalDate.parse(endDate, DateTimeFormatter.ofPattern("yyyy-MM-dd")) : null;
+//
+//            ResponseEntity<ApiResponse<?>> validationResponse = validateDateRangeWithTimeFilter(timeFilter, start, end);
+//            if (validationResponse != null) {
+//                return validationResponse;
+//            }
+//
+//            // Specification for paginated forms
+//            Specification<Forms> spec = Specification.allOf(
+//                    FormSpecification.isActive(),
+//                    FormSpecification.searchTerm(searchTerm),
+//                    FormSpecification.filterByServiceNeeded(filterTerm),
+//                    FormSpecification.byTimeFilter(timeFilter),
+//                    FormSpecification.createdBetween(start, end)
+//            );
+//
+//            if (!isAdmin) {
+//                spec = spec.and(FormSpecification.byUser(user));
+//            }
+//
+//            Page<Forms> formPage = formRepository.findAll(spec, pageable);
+//
+//            List<FormResponse> responseList = formPage.getContent().stream()
+//                    .map(f -> FormResponse.builder()
+//                            .formId(f.getId())
+//                            .firstName(f.getFirstName())
+//                            .lastName(f.getLastName())
+//                            .email(f.getEmail())
+//                            .serviceNeeded(f.getServiceNeeded().name())
+//                            .status(f.getStatus().name())
+//                            .adminReply(f.getAdminReply())
+//                            .submittedAt(f.getCreatedAt())
+//                            .repliedAt(f.getRepliedAt())
+//                            .isActive(f.getIsActive())
+//                            .companyName(f.getCompanyName())
+//                            .message(f.getMessage())
+//                            .build()
+//                    )
+//                    .toList();
+//
+//            PaginationResponse<FormResponse> paginationResponse = PaginationResponse.<FormResponse>builder()
+//                    .content(responseList)
+//                    .page(formPage.getNumber())
+//                    .size(formPage.getSize())
+//                    .totalElements(formPage.getTotalElements())
+//                    .totalPages(formPage.getTotalPages())
+//                    .last(formPage.isLast())
+//                    .build();
+//
+//            // ========== CURRENT PERIOD STATISTICS ==========
+//            Specification<Forms> dashboardSpec = Specification.allOf(
+//                    FormSpecification.isActive(),
+//                    FormSpecification.byTimeFilter(timeFilter),
+//                    FormSpecification.createdBetween(start, end)
+//            );
+//
+//            List<Forms> dashboardForms = formRepository.findAll(dashboardSpec);
+//
+//            long totalActiveForms = dashboardForms.stream()
+//                    .filter(f -> f.getStatus() == FormStatus.ACTIVE)
+//                    .count();
+//
+//            long totalRepliedForms = dashboardForms.stream()
+//                    .filter(f -> f.getStatus() == FormStatus.REPLIED)
+//                    .count();
+//
+//            // Service breakdown counts
+//            long businessDevelopment = dashboardForms.stream()
+//                    .filter(f -> f.getServiceNeeded() == ServiceNeeded.BUSINESS_DEVELOPMENT)
+//                    .count();
+//
+//            long brandDevelopment = dashboardForms.stream()
+//                    .filter(f -> f.getServiceNeeded() == ServiceNeeded.BRAND_DEVELOPMENT)
+//                    .count();
+//
+//            long capacityBuilding = dashboardForms.stream()
+//                    .filter(f -> f.getServiceNeeded() == ServiceNeeded.CAPACITY_BUILDING)
+//                    .count();
+//
+//            long tradeAndInvestmentFacilitation = dashboardForms.stream()
+//                    .filter(f -> f.getServiceNeeded() == ServiceNeeded.TRADE_AND_INVESTMENT_FACILITATION)
+//                    .count();
+//
+//            long businessQuest = dashboardForms.stream()
+//                    .filter(f -> f.getServiceNeeded() == ServiceNeeded.BUSINESS_QUEST)
+//                    .count();
+//
+//            long marketingConsulting = dashboardForms.stream()
+//                    .filter(f -> f.getServiceNeeded() == ServiceNeeded.MARKETING_CONSULTING)
+//                    .count();
+//
+//            long contact = dashboardForms.stream()
+//                    .filter(f -> f.getServiceNeeded() == ServiceNeeded.CONTACT)
+//                    .count();
+//
+//            long others = dashboardForms.stream()
+//                    .filter(f -> f.getServiceNeeded() == ServiceNeeded.OTHERS)
+//                    .count();
+//
+//
+//            // ========== PREVIOUS PERIOD STATISTICS ==========
+//            LocalDateTime now = LocalDateTime.now();
+//            LocalDateTime compareFrom = null;
+//            LocalDateTime compareTo = null;
+//
+//            if (start != null && end != null) {
+//                long days = Duration.between(
+//                        start.atStartOfDay(),
+//                        end.atTime(23, 59, 59)
+//                ).toDays();
+//
+//                compareFrom = start.minusDays(days + 1).atStartOfDay();
+//                compareTo = start.minusDays(1).atTime(23, 59, 59);
+//            } else if (!"alltime".equalsIgnoreCase(timeFilter)) {
+//                LocalDateTime from = FormSpecification.getFromDateTime(timeFilter);
+//                Duration duration = Duration.between(from, now);
+//                compareTo = from.minusSeconds(1);
+//                compareFrom = compareTo.minus(duration);
+//            }
+//
+//            Double activeFormsChange = null;
+//            Double repliedFormsChange = null;
+//
+//            if (compareFrom != null && compareTo != null) {
+//                final LocalDateTime finalCompareFrom = compareFrom;
+//                final LocalDateTime finalCompareTo = compareTo;
+//
+//                Specification<Forms> prevDashboardSpec = Specification.allOf(
+//                        FormSpecification.isActive(),
+//                        (root, query, cb) -> cb.between(root.get("createdAt"), finalCompareFrom, finalCompareTo)
+//                );
+//
+//                List<Forms> prevDashboardForms = formRepository.findAll(prevDashboardSpec);
+//
+//                long prevActiveForms = prevDashboardForms.stream()
+//                        .filter(f -> f.getStatus() == FormStatus.ACTIVE)
+//                        .count();
+//
+//                long prevRepliedForms = prevDashboardForms.stream()
+//                        .filter(f -> f.getStatus() == FormStatus.REPLIED)
+//                        .count();
+//
+//                activeFormsChange = calculatePercentageChange(prevActiveForms, totalActiveForms);
+//                repliedFormsChange = calculatePercentageChange(prevRepliedForms, totalRepliedForms);
+//            }
+//
+//            FormResponse statistics = FormResponse.builder()
+//                    .activeConversations(totalActiveForms)
+//                    .activeConversationsChange(activeFormsChange)
+//                    .repliedForms(totalRepliedForms)
+//                    .repliedFormsChange(repliedFormsChange)
+//                    .businessDevelopment(businessDevelopment)
+//                    .brandDevelopment(brandDevelopment)
+//                    .capacityBuilding(capacityBuilding)
+//                    .tradeAndInvestmentFacilitation(tradeAndInvestmentFacilitation)
+//                    .businessQuest(businessQuest)
+//                    .marketingConsulting(marketingConsulting)
+//                    .contact(contact)
+//                    .others(others)
+//                    .build();
+//
+//            Map<String, Object> finalResponse = Map.of(
+//                    "pagination", paginationResponse,
+//                    "statistics", statistics
+//            );
+//
+//            return ResponseEntity.ok(createSuccessResponse(finalResponse, "Forms fetched successfully"));
+//
+//        } catch (Exception e) {
+//            log.error("Error fetching forms", e);
+//            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+//                    .body(createFailureResponse(e.getLocalizedMessage(), "Failed to fetch forms"));
+//        }
+//    }
+
 
     @Override
     public ResponseEntity<ApiResponse<?>> getForm(
@@ -106,10 +308,12 @@ public class FormServiceImpl implements FormService {
             }
 
             BaseUser user = optionalUser.get();
-            boolean isAdmin = user.getRole() != null && "ADMIN".equalsIgnoreCase(user.getRole().getName());
+            boolean isAdmin = user.getRole() != null
+                    && "ADMIN".equalsIgnoreCase(user.getRole().getName());
 
-            Sort.Direction direction = "asc".equalsIgnoreCase(paginationRequest.getOrder()) ?
-                    Sort.Direction.ASC : Sort.Direction.DESC;
+            Sort.Direction direction = "asc".equalsIgnoreCase(paginationRequest.getOrder())
+                    ? Sort.Direction.ASC
+                    : Sort.Direction.DESC;
 
             Pageable pageable = PageRequest.of(
                     paginationRequest.getPage(),
@@ -117,16 +321,20 @@ public class FormServiceImpl implements FormService {
                     Sort.by(direction, paginationRequest.getSortBy())
             );
 
-            LocalDate start = startDate != null ? LocalDate.parse(startDate, DateTimeFormatter.ofPattern("yyyy-MM-dd")) : null;
-            LocalDate end = endDate != null ? LocalDate.parse(endDate, DateTimeFormatter.ofPattern("yyyy-MM-dd")) : null;
+            LocalDate start = startDate != null
+                    ? LocalDate.parse(startDate, DateTimeFormatter.ofPattern("yyyy-MM-dd"))
+                    : null;
 
-            // VALIDATE DATE RANGE WITH TIME FILTER
-            ResponseEntity<ApiResponse<?>> validationResponse = validateDateRangeWithTimeFilter(timeFilter, start, end);
+            LocalDate end = endDate != null
+                    ? LocalDate.parse(endDate, DateTimeFormatter.ofPattern("yyyy-MM-dd"))
+                    : null;
+
+            ResponseEntity<ApiResponse<?>> validationResponse =
+                    validateDateRangeWithTimeFilter(timeFilter, start, end);
             if (validationResponse != null) {
                 return validationResponse;
             }
 
-            // Specification for paginated forms
             Specification<Forms> spec = Specification.allOf(
                     FormSpecification.isActive(),
                     FormSpecification.searchTerm(searchTerm),
@@ -141,34 +349,47 @@ public class FormServiceImpl implements FormService {
 
             Page<Forms> formPage = formRepository.findAll(spec, pageable);
 
+            // ================= FIX #1: NULL-SAFE MAPPING =================
             List<FormResponse> responseList = formPage.getContent().stream()
                     .map(f -> FormResponse.builder()
                             .formId(f.getId())
                             .firstName(f.getFirstName())
                             .lastName(f.getLastName())
                             .email(f.getEmail())
-                            .serviceNeeded(f.getServiceNeeded().name())
-                            .status(f.getStatus().name())
+
+                            // 🔧 FIX: serviceNeeded CAN BE NULL
+                            .serviceNeeded(
+                                    f.getServiceNeeded() != null
+                                            ? f.getServiceNeeded().name()
+                                            : ""
+                            )
+
+                            .status(
+                                    f.getStatus() != null
+                                            ? f.getStatus().name()
+                                            : ""
+                            )
                             .adminReply(f.getAdminReply())
                             .submittedAt(f.getCreatedAt())
                             .repliedAt(f.getRepliedAt())
                             .isActive(f.getIsActive())
                             .companyName(f.getCompanyName())
+                            .industryName(f.getIndustryName())
                             .message(f.getMessage())
                             .build()
                     )
                     .toList();
 
-            PaginationResponse<FormResponse> paginationResponse = PaginationResponse.<FormResponse>builder()
-                    .content(responseList)
-                    .page(formPage.getNumber())
-                    .size(formPage.getSize())
-                    .totalElements(formPage.getTotalElements())
-                    .totalPages(formPage.getTotalPages())
-                    .last(formPage.isLast())
-                    .build();
+            PaginationResponse<FormResponse> paginationResponse =
+                    PaginationResponse.<FormResponse>builder()
+                            .content(responseList)
+                            .page(formPage.getNumber())
+                            .size(formPage.getSize())
+                            .totalElements(formPage.getTotalElements())
+                            .totalPages(formPage.getTotalPages())
+                            .last(formPage.isLast())
+                            .build();
 
-            // ========== CURRENT PERIOD STATISTICS ==========
             Specification<Forms> dashboardSpec = Specification.allOf(
                     FormSpecification.isActive(),
                     FormSpecification.byTimeFilter(timeFilter),
@@ -185,7 +406,6 @@ public class FormServiceImpl implements FormService {
                     .filter(f -> f.getStatus() == FormStatus.REPLIED)
                     .count();
 
-            // Service breakdown counts
             long businessDevelopment = dashboardForms.stream()
                     .filter(f -> f.getServiceNeeded() == ServiceNeeded.BUSINESS_DEVELOPMENT)
                     .count();
@@ -206,62 +426,37 @@ public class FormServiceImpl implements FormService {
                     .filter(f -> f.getServiceNeeded() == ServiceNeeded.BUSINESS_QUEST)
                     .count();
 
-            // ========== PREVIOUS PERIOD STATISTICS ==========
-            LocalDateTime now = LocalDateTime.now();
-            LocalDateTime compareFrom = null;
-            LocalDateTime compareTo = null;
+            long marketingConsulting = dashboardForms.stream()
+                    .filter(f -> f.getServiceNeeded() == ServiceNeeded.MARKETING_CONSULTING)
+                    .count();
 
-            if (start != null && end != null) {
-                long days = Duration.between(
-                        start.atStartOfDay(),
-                        end.atTime(23, 59, 59)
-                ).toDays();
+            long contact = dashboardForms.stream()
+                    .filter(f -> f.getServiceNeeded() == ServiceNeeded.CONTACT)
+                    .count();
 
-                compareFrom = start.minusDays(days + 1).atStartOfDay();
-                compareTo = start.minusDays(1).atTime(23, 59, 59);
-            } else if (!"alltime".equalsIgnoreCase(timeFilter)) {
-                LocalDateTime from = FormSpecification.getFromDateTime(timeFilter);
-                Duration duration = Duration.between(from, now);
-                compareTo = from.minusSeconds(1);
-                compareFrom = compareTo.minus(duration);
-            }
+            long playTest = dashboardForms.stream()
+                    .filter(f -> f.getServiceNeeded() == ServiceNeeded.PLAY_TEST)
+                    .count();
 
-            Double activeFormsChange = null;
-            Double repliedFormsChange = null;
 
-            if (compareFrom != null && compareTo != null) {
-                final LocalDateTime finalCompareFrom = compareFrom;
-                final LocalDateTime finalCompareTo = compareTo;
 
-                Specification<Forms> prevDashboardSpec = Specification.allOf(
-                        FormSpecification.isActive(),
-                        (root, query, cb) -> cb.between(root.get("createdAt"), finalCompareFrom, finalCompareTo)
-                );
 
-                List<Forms> prevDashboardForms = formRepository.findAll(prevDashboardSpec);
-
-                long prevActiveForms = prevDashboardForms.stream()
-                        .filter(f -> f.getStatus() == FormStatus.ACTIVE)
-                        .count();
-
-                long prevRepliedForms = prevDashboardForms.stream()
-                        .filter(f -> f.getStatus() == FormStatus.REPLIED)
-                        .count();
-
-                activeFormsChange = calculatePercentageChange(prevActiveForms, totalActiveForms);
-                repliedFormsChange = calculatePercentageChange(prevRepliedForms, totalRepliedForms);
-            }
+            long others = dashboardForms.stream()
+                    .filter(f -> f.getServiceNeeded() == ServiceNeeded.OTHERS)
+                    .count();
 
             FormResponse statistics = FormResponse.builder()
                     .activeConversations(totalActiveForms)
-                    .activeConversationsChange(activeFormsChange)
                     .repliedForms(totalRepliedForms)
-                    .repliedFormsChange(repliedFormsChange)
                     .businessDevelopment(businessDevelopment)
                     .brandDevelopment(brandDevelopment)
                     .capacityBuilding(capacityBuilding)
                     .tradeAndInvestmentFacilitation(tradeAndInvestmentFacilitation)
                     .businessQuest(businessQuest)
+                    .marketingConsulting(marketingConsulting)
+                    .contact(contact)
+                    .playTest(playTest)
+                    .others(others)
                     .build();
 
             Map<String, Object> finalResponse = Map.of(
@@ -270,6 +465,56 @@ public class FormServiceImpl implements FormService {
             );
 
             return ResponseEntity.ok(createSuccessResponse(finalResponse, "Forms fetched successfully"));
+
+        } catch (Exception e) {
+            log.error("Error fetching forms", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(createFailureResponse(e.getLocalizedMessage(), "Failed to fetch forms"));
+        }
+    }
+
+    @Override
+    public ResponseEntity<ApiResponse<?>> getAllForms(Principal principal) {
+        try {
+
+            Optional<BaseUser> optionalUser = baseUserRepository.findByEmail(principal.getName().trim());
+
+            if (optionalUser.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body(createFailureResponse("User not found", "User does not exist"));
+            }
+
+            BaseUser admin = optionalUser.get();
+
+            if (admin.getRole() == null || !"ADMIN".equalsIgnoreCase(admin.getRole().getName())) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body(createFailureResponse("Access denied", "Admin access required"));
+            }
+
+            List<Forms> forms = formRepository.findAll();
+
+            List<FormResponse> formResponses = forms.stream()
+                    .map(f -> FormResponse.builder()
+                            .formId(f.getId())
+                            .firstName(f.getFirstName())
+                            .lastName(f.getLastName())
+                            .email(f.getEmail())
+                            .serviceNeeded(f.getServiceNeeded() != null ? f.getServiceNeeded().name() : null)
+                            .industryName(f.getIndustryName() != null? f.getIndustryName() : null)
+                            .status(f.getStatus() != null ? f.getStatus().name() : null)
+                            .adminReply(f.getAdminReply())
+                            .submittedAt(f.getCreatedAt())
+                            .repliedAt(f.getRepliedAt())
+                            .isActive(f.getIsActive())
+                            .companyName(f.getCompanyName())
+                            .message(f.getMessage())
+                            .build()
+                    )
+                    .toList();
+
+            return ResponseEntity.ok(
+                    createSuccessResponse(formResponses, "Forms fetched successfully")
+            );
 
         } catch (Exception e) {
             log.error("Error fetching forms", e);

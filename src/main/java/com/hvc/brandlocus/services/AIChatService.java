@@ -13,6 +13,7 @@ import java.security.Principal;
 public interface AIChatService {
     ResponseEntity<ApiResponse<?>> startChat(Principal principal,ChatMessageRequest request);
     ResponseEntity<ApiResponse<?>> getChats(Principal principal, @RequestParam(required = false) Long sessionId, PaginationRequest paginationRequest);
+    public ResponseEntity<ApiResponse<?>> getAllChats(Principal principal,Long sessionId);
     ResponseEntity<ApiResponse<?>> reviewAIResponse(Principal principal, Long messageId, EditAIResponseRequest request);
 
 }

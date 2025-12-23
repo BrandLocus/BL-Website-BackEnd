@@ -25,6 +25,12 @@ public class FormResponse {
     private Long capacityBuilding;
     private Long tradeAndInvestmentFacilitation;
     private Long businessQuest;
+    private Long marketingConsulting;
+    private Long contact;
+    private Long playTest;
+    private Long others;
+
+
 
     // Form detail fields
     private Long formId;
@@ -33,6 +39,7 @@ public class FormResponse {
     private String email;
     private String serviceNeeded;
     private String companyName;
+    private String industryName;
     private String message;
     private String adminReply;
     private String status;

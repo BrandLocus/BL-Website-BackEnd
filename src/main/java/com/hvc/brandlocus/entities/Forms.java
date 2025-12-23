@@ -35,7 +35,7 @@ public class Forms extends BaseEntity{
     @Column(name = "service_needed")
     private ServiceNeeded serviceNeeded;
 
-//    private String industryName;
+    private String industryName;
 
     private String companyName;
 

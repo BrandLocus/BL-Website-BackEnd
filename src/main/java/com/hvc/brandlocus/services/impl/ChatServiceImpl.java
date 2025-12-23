@@ -103,8 +103,11 @@ public class ChatServiceImpl implements AIChatService {
                     user.getProfile() != null ? user.getProfile().getBusinessBrief() : "",
                     user.getProfile() != null ? user.getProfile().getBusinessName() : "",
                     user.getProfile() != null ? user.getProfile().getIndustryName() : "",
-                    user.getFirstName() + " " + user.getLastName()
+                    user.getFirstName() + " " + user.getLastName(),
+                    user.getProfile() != null ? user.getProfile().getState() : user.getState(),
+                    user.getProfile() != null ? user.getProfile().getCountry() : user.getCountry()
             );
+
 
 
             MessageClassification classification = openAIService.classifyMessage(aiAnswer);
@@ -131,6 +134,8 @@ public class ChatServiceImpl implements AIChatService {
                     .userType(userMessage.getSender().toString())
                     .chatType(userMessage.getChatType().toString())
                     .content(userMessage.getContent())
+                    .sector(classification.getSector())
+                    .topic(classification.getTopic())
                     .createdAt(userMessage.getCreatedAt().toString())
                     .build();
 
@@ -140,9 +145,9 @@ public class ChatServiceImpl implements AIChatService {
                     .userType(aiMessage.getSender().toString())
                     .chatType(aiMessage.getChatType().toString())
                     .content(aiMessage.getContent())
-                    .name(user.getFirstName() + " " + user.getLastName())
-                    .industryName(user.getIndustryName())
                     .businessName(user.getBusinessName())
+                    .sector(classification.getSector())
+                    .topic(classification.getTopic())
                     .createdAt(aiMessage.getCreatedAt().toString())
                     .build();
 
@@ -274,6 +279,85 @@ public class ChatServiceImpl implements AIChatService {
                     .body(createFailureResponse(ex.getLocalizedMessage(), "Failed to fetch chats"));
         }
     }
+    @Override
+    public ResponseEntity<ApiResponse<?>> getAllChats(Principal principal, Long sessionId) {
+        try {
+            Optional<BaseUser> optionalUser =
+                    baseUserRepository.findByEmail(principal.getName().trim());
+
+            if (optionalUser.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body(createFailureResponse("User not found", "User does not exist"));
+            }
+
+            BaseUser admin = optionalUser.get();
+
+            if (admin.getRole() == null ||
+                    !"ADMIN".equalsIgnoreCase(admin.getRole().getName())) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body(createFailureResponse("Access denied", "Admin access required"));
+            }
+
+            List<ChatMessage> messages;
+
+            // ✅ Conditional fetch
+            if (sessionId != null) {
+                messages = chatMessageRepository.findByChatSessionId(sessionId);
+
+                if (messages.isEmpty()) {
+                    return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                            .body(createFailureResponse(
+                                    "Not found",
+                                    "No chats found for this session"
+                            ));
+                }
+            } else {
+                messages = chatMessageRepository.findAll();
+            }
+
+
+            List<ChatMessageResponse> responses =
+                    messages.stream()
+                            .map(msg -> {
+                                BaseUser user = msg.getChatSession().getUser();
+
+                                return ChatMessageResponse.builder()
+                                        .messageId(msg.getId())
+                                        .sessionId(msg.getChatSession().getId())
+                                        .firstName(user != null ? user.getFirstName() : null)
+                                        .lastName(user != null ? user.getLastName() : null)
+                                        .userType(msg.getSender().name())
+                                        .chatType(msg.getChatType().name())
+                                        .content(msg.getContent())
+                                        .sector(msg.getSector())
+                                        .keywords(msg.getKeywords())
+                                        .topic(msg.getTopic())
+                                        .businessName(user!=null ?user.getBusinessName():null)
+                                        .businessBrief(user!=null ?user.getBusinessBrief():null)
+                                        .state(user!=null ?user.getState():null)
+                                        .country(user!=null ?user.getCountry():null)
+                                        .createdAt(msg.getCreatedAt().toString())
+                                        .build();
+                            })
+                            .toList();
+
+            return ResponseEntity.ok(
+                    createSuccessResponse(responses, "Chats fetched successfully")
+            );
+
+        } catch (Exception e) {
+            log.error("Error fetching chats", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(createFailureResponse(
+                            e.getLocalizedMessage(),
+                            "Failed to fetch chats"
+                    ));
+        }
+    }
+
+
+
+
 
 
     @Override
